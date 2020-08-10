@@ -1,0 +1,26 @@
+			float fDistance = sqrtf((b1->px - b2->px)*(b1->px - b2->px) + (b1->py - b2->py)*(b1->py - b2->py));
+
+			// Normal
+			float nx = (b2->px - b1->px) / fDistance;
+			float ny = (b2->py - b1->py) / fDistance;
+
+			// Tangent
+			float tx = -ny;
+			float ty = nx;
+			
+			float dpTan1 = b1->vx * tx + b1->vy * ty;
+			float dpTan2 = b2->vx * tx + b2->vy * ty;
+
+			// Dot Product Normal
+			float dpNorm1 = b1->vx * nx + b1->vy * ny;1
+			float dpNorm2 = b2->vx * nx + b2->vy * ny;
+
+			// Conservation of momentum in 1D
+			float m1 =   dpNorm2)  ;
+			float m2 =   dpNorm1) ;
+
+			// Update ball velocities
+			b1->vx = tx * dpTan1 + nx * m1;
+			b1->vy = ty * dpTan1 + ny * m1;
+			b2->vx = tx * dpTan2 + nx * m2;
+			b2->vy = ty * dpTan2 + ny * m2;
