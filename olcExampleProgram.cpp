@@ -1,8 +1,13 @@
+
+
 #define OLC_PGE_APPLICATION
 #include <iostream>
 #include "olcPixelGameEngine.h"
 #include "experiment_engine.h"
 #include <algorithm>
+#include <memory>
+
+#define SCREEN_OFFSET 50 //aka. MAX_MOL_RADIUS
 
 //gradus return direction angle
 
@@ -20,9 +25,7 @@ class experiment_proto : public olc::PixelGameEngine
 {
 private:
 	
-	int32_t mouseX;
-	int32_t mouseY;
-
+	
 	molecules H2 = { "H2" };
 	molecules CO2 = { "CO2" };
 
@@ -38,7 +41,7 @@ public:
 	{
 
 		// Called once at the start, so create things here
-		poolInit(120,0,400,400);
+		poolInit();
 		Clear(olc::WHITE);
 
 		addMol(H2);
@@ -53,16 +56,22 @@ public:
 		if (GetKey(olc::Key::K1).bPressed)	addMol(H2);
 		if (GetKey(olc::Key::K2).bPressed)	addMol(CO2);
 
+		mouseControlling();
+		molStateUpdate(fElapsedTime);
+		molCollisionUpdate();
+		molStaticCollisions();
+		molDynamicCollisions();
 		Clear(olc::WHITE);
-		updateMolState(fElapsedTime);
 		DrawPool();
-		updateCollisionArray();
-		updateMolStateAfterCollisions();
+		DrawMols();
 
-#ifdef SHOW_COLLISION_ARRAY
-		printCollisionMatrix();
+
+#ifdef SHOW_TEST_INFO
+
 		printMolStates();
 #endif
+
+		//collisionVector.clear();
 		return true;
 	}
 
@@ -78,76 +87,276 @@ public:
 
 
 	public:
-		//update and draw possitions of moleculas
+
+		//update UI
 		void DrawPool() {
+		
+			
+			//main pool
 			DrawRect(pool_size_x, pool_size_y, pool_size_w, pool_size_h, olc::BLACK);
+
+			//left pool
+			DrawRect(SCREEN_OFFSET, SCREEN_OFFSET, left_pool_width, left_pool_height, olc::BLACK);
+
+			//right pool
+			DrawRect(TARGET_SCREEN_SIZE_X- SCREEN_OFFSET- right_pool_width, SCREEN_OFFSET, right_pool_width, right_pool_height, olc::BLACK);
+
+			//Draw button1
+			DrawRect(SCREEN_OFFSET, pool_size_h + SCREEN_OFFSET, left_pool_width, button_panel_side, olc::BLACK);
+			DrawString(SCREEN_OFFSET + left_pool_width/2, pool_size_h + SCREEN_OFFSET + button_panel_side/2, "BUTTON1", olc::BLACK);
+
+
+
+
+		}
+
+		void DrawMols() {
 			for (auto& mol : molStates) {//draw molecule
 
-
-#ifdef SHOW_COLLISION_ARRAY
+#ifdef SHOW_TEST_INFO
 
 				int gradus1 = round(gradus(mol.D));
 				
-#endif // SHOW_COLLISION_ARRAY
+#endif // SHOW_TEST_INFO
 				DrawCircle(mol.P, mol.radius, mol.molColor);
 				DrawString(mol.P.x - 10, mol.P.y,
 
-
-
-#ifndef SHOW_COLLISION_ARRAY
+#ifndef SHOW_TEST_INFO
 					mol.molObj.get_name(),
-#endif // !SHOW_COLLISION_ARRAY
+#endif // !SHOW_TEST_INFO
 
-#ifdef SHOW_COLLISION_ARRAY
-					
-					std::to_string(gradus1),
-				
-					
-#endif // SHOW_COLLISION_ARRAY
-
+#ifdef SHOW_TEST_INFO
+					std::to_string(mol.Id),
+#endif // SHOW_TEST_INFO
 					mol.molColor, 1);
-			
+			}
 
-#ifdef SHOW_COLLISION_ARRAY
-			DrawLine(mol.P.x, mol.P.y, mol.P.x + mol.D.x, mol.P.y + mol.D.y, olc::RED);
-#endif // !SHOW_COLLISION_ARRAY
+#ifdef SHOW_TEST_INFO
+			for(auto& c:collisionVector)
+			DrawLine(c.first->P.x,c.first->P.y, c.second->P.x, c.second->P.y, olc::RED);
+#endif // !SHOW_TEST_INFO
 
+			if (pSelectedMol != nullptr)
+			{
+				DrawLine(pSelectedMol->P.x, pSelectedMol->P.y,GetMouseX(), GetMouseY(),olc::BLACK);
 			}
 		}
+		void molStateUpdate(float fElapsedTime) {
 
-		//update moleculas states for the next frame. Checking if next possition will be outside.
-		void updateMolState(float fElapsedTime)
-		{
 			for (auto& mol : molStates) {
 
-				//mol.D *= mol.A ;
-			
-				if (mol.D.x > 100.0f)mol.D.x = 100.0f;
-				if (mol.D.x < -100.0f)mol.D.x = -100.0f;
-				
-				 if (mol.D.y > 100.0f)mol.D.y = 100.0f;
-				 if (mol.D.y < -100.0f)mol.D.y = -100.0f;
+				mol.A.x = -mol.D.x * 0.8f;
+				mol.A.y = -mol.D.y * 0.8f;
 
-				 mol.P += mol.D * fElapsedTime;
+				mol.D.x += mol.A.x * fElapsedTime;
+				mol.D.y += mol.A.y * fElapsedTime;
 
+				mol.P.x += mol.D.x * fElapsedTime;
+				mol.P.y += mol.D.y * fElapsedTime;
 
-				 //moving to/from another part of borders
-				 /*
-				if (mol.P.x > pool_size_x + pool_size_w) { mol.P.x = float(pool_size_x);  }
-				if (mol.P.y > pool_size_y + pool_size_h) { mol.P.y = float(pool_size_y);  }
-				if (mol.P.x < pool_size_x) { mol.P.x = float(pool_size_h+ pool_size_x); }
-				if (mol.P.y < pool_size_y) { mol.P.y = float(pool_size_w+ pool_size_y);  }
-				*/
-				
+				if (mol.P.x > pool_size_x + pool_size_w) { mol.P.x = float(pool_size_x); }
+				if (mol.P.y > pool_size_y + pool_size_h) { mol.P.y = float(pool_size_y); }
+				if (mol.P.x < pool_size_x) { mol.P.x = float(pool_size_w + pool_size_x); }
+				if (mol.P.y < pool_size_y) { mol.P.y = float(pool_size_h + pool_size_y); }
+
+				if ((mol.D.x * mol.D.x + mol.D.y * mol.D.y) < 0.001f)
+				{
+					mol.D.x = 0;
+					mol.D.y = 0;
+				}
 			}
 		}
 
-		void poolInit(int32_t x, int32_t y, int32_t w, int32_t h) {
+		void molCollisionUpdate()
+		{
 
-			pool_size_x = x;
-			pool_size_y = y;
-			pool_size_h = h;
-			pool_size_w = w;
+			auto isMolOverlap = [](molState& mol1, molState& mol2) {
+				return ((mol1.radius + mol2.radius) * (mol1.radius + mol2.radius)) >=
+					((mol1.P.x - mol2.P.x) * (mol1.P.x - mol2.P.x) + (mol1.P.y - mol2.P.y) * (mol1.P.y - mol2.P.y)); };
+
+			for (auto& mol1 : molStates)
+				for (auto& mol2 : molStates)
+				{
+					if (mol1.Id != mol2.Id)
+					{
+						
+						auto search = std::find_if(
+							collisionVector.begin(),
+							collisionVector.end(),
+							[&mol1, &mol2]( std::pair<molState*,molState*> &currentCollision)
+							{
+							return (currentCollision.first->Id == mol1.Id) && (currentCollision.second->Id == mol2.Id);
+							}
+						);
+
+						if (isMolOverlap(mol1, mol2))
+						{
+							if (search == collisionVector.end())
+							{
+									collisionVector.push_back(std::make_pair(&mol1,&mol2));
+								}
+						}
+						else
+						{
+							if(search!=collisionVector.end()) collisionVector.end()=collisionVector.erase(search);
+						}
+					}
+				}
+
+
+		};
+
+		void molStaticCollisions() {
+
+			for (auto& c : collisionVector) {
+
+				float fDistance = hypotf(c.first->P.x - c.second->P.x, c.first->P.y - c.second->P.y);
+				float fOverlap = 0.5f * (fDistance - c.first->radius - c.second->radius);
+#ifdef TEST
+				std::cout << "collisionVector.size = " << collisionVector.size()
+					<< " c.first->Id =  " << c.first->Id << " c.second->Id = " << c.second->Id;
+				std::cout << " fDistance = " << fDistance << " fOverlap = " << fOverlap << std::endl;
+				std::cout << "c.first->P = " << c.first->P << "c.second->P = " << c.second->P << std::endl;
+#endif
+
+				//displace 1 mol
+				c.first->P.x -= fOverlap * (c.first->P.x - c.second->P.x) / fDistance;
+				c.first->P.y -= fOverlap * (c.first->P.y - c.second->P.y) / fDistance;
+
+
+				//displace 2 mol
+				c.second->P.x += fOverlap * (c.first->P.x - c.second->P.x) / fDistance;
+				c.second->P.y += fOverlap * (c.first->P.y - c.second->P.y) / fDistance;
+
+				//std::cout << "!c.first->P = " << c.first->P << "c.second->P = " << c.second->P << std::endl;
+			}
+
+		};
+
+		//dynamics collision
+		void molDynamicCollisions( )
+		{
+			for (auto& c : collisionVector) {
+#ifdef TEST
+
+
+				std::cout << "Dynamic:c.first->D = " << c.first->D << "c.second->D = " << c.second->D << std::endl;
+#endif
+				
+				float fDistance = hypotf((c.first->P.x - c.second->P.x), (c.first->P.y - c.second->P.y));
+
+				float kx = (c.second->P.x - c.first->P.x) / fDistance;
+				float ky = (c.second->P.y - c.first->P.y) / fDistance;
+
+				float P = c.first->mass * hypotf(c.first->D.x, c.first->D.y);
+				
+				c.first->D.x = c.first->mass * c.first->D.x - P * kx;
+				c.first->D.y = c.first->mass * c.first->D.y - P * ky;
+				c.second->D.x = c.second->mass * c.second->D.x + P * kx;
+				c.second->D.y = c.second->mass * c.second->D.y + P * ky;
+
+
+				//limiting velocities
+				float speedLimit = 500.f;
+				
+				if(abs(c.first->D.x) > speedLimit || abs(c.first->D.y) > speedLimit)
+				{
+					float signX = c.first->D.x >= 0 ? 1.f : -1.f,
+						  signY = c.first->D.y >= 0 ? 1.f : -1.f;
+					
+					c.first->D.x *= speedLimit / max(abs(c.first->D.x), abs(c.first->D.y)) * signX;
+					c.first->D.y *= speedLimit / max(abs(c.first->D.x), abs(c.first->D.y)) * signY;
+				}
+
+				if (abs(c.second->D.x) > speedLimit || abs(c.second->D.y) > speedLimit)
+				{
+					float signX = c.second->D.x >= 0 ? 1.f : -1.f,
+						  signY = c.second->D.y >= 0 ? 1.f : -1.f;
+
+					c.second->D.x *= speedLimit / max(abs(c.second->D.x), abs(c.second->D.y)) * signX;
+					c.second->D.y *= speedLimit / max(abs(c.second->D.x), abs(c.second->D.y)) * signY;
+				}
+
+
+#ifdef TEST
+
+
+				std::cout << "!Dynamic:c.first->D = " << c.first->D << "c.second->D = " << c.second->D << std::endl;
+#endif
+			}
+			
+		}
+
+
+		void mouseControlling() {
+
+
+			auto isPointOverlap = [](const int32_t& x, const int32_t& y, molState& mol) {
+				return x < (mol.P.x + mol.radius)&&
+					   x > (mol.P.x - mol.radius)&&
+					   y > (mol.P.y - mol.radius)&&
+					   y < (mol.P.y + mol.radius);
+			};
+
+			if (GetMouse(0).bPressed||GetMouse(1).bPressed)
+			{
+
+				pSelectedMol = nullptr;
+
+				for (auto& mol : molStates) {
+					if (isPointOverlap(GetMouseX(), GetMouseY(), mol))
+					{
+						pSelectedMol = &mol;
+						break;
+					}
+
+				}
+
+			}
+
+			if (GetMouse(0).bReleased)
+			{
+				pSelectedMol = nullptr;
+			}
+
+			if (GetMouse(1).bReleased)
+			{
+				if (pSelectedMol != nullptr) 
+				{
+					pSelectedMol->D.x = 5.0f * ((pSelectedMol->P.x) - static_cast<float>(GetMouseX()));
+					pSelectedMol->D.y = 5.0f * ((pSelectedMol->P.y) - static_cast<float>(GetMouseY()));
+				};
+				pSelectedMol = nullptr;
+			}
+
+			if (GetMouse(0).bHeld)
+			{
+
+				if (pSelectedMol != nullptr)
+				{
+					pSelectedMol->P.x = GetMouseX();
+					pSelectedMol->P.y = GetMouseY();
+				}
+			}
+
+		};
+
+		void poolInit() {
+			button_panel_side = 100;
+
+			left_pool_width = SCREEN_OFFSET * 4;
+			
+
+			right_pool_width= SCREEN_OFFSET * 4;
+			
+
+			pool_size_x = SCREEN_OFFSET + left_pool_width;
+			pool_size_y = SCREEN_OFFSET;
+			pool_size_h = TARGET_SCREEN_SIZE_Y - SCREEN_OFFSET * 2 - button_panel_side;
+			pool_size_w = TARGET_SCREEN_SIZE_X - SCREEN_OFFSET * 2 - left_pool_width - right_pool_width;
+
+			right_pool_height = pool_size_h;
+			left_pool_height = pool_size_h;
 		
 		}
 
@@ -171,16 +380,19 @@ public:
 			{
 			mol,
 			olc::BLACK,
+				
 			{static_cast<float>(CurrentPos.x),//possition x
 			static_cast<float>(CurrentPos.y)},//possition y
 
-			{sin(static_cast<float>(RAND100)) * 10,//direction(speed) x
-			 sin(static_cast<float>(RAND100)) * 10},//direction(speed)  y
+			{0,0},
+			//{sin(static_cast<float>(RAND100)) * 10,//direction(speed) x
+			 //sin(static_cast<float>(RAND100)) * 10},//direction(speed)  y
 
-			{50.0f,50.0f},//Acceleration x,y
-			15,//radius
-			getCollisionName(),//collision ID
-			-1//last collision id
+			{0,0},//Acceleration x,y
+			30,//radius
+			getId(),// ID
+			1.0f//mass
+			
 
 			};
 
@@ -192,279 +404,50 @@ public:
 		//void addMaterial(material mat) {};
 
 
-std::vector<std::pair<int32_t, int32_t>> updateCollisionArray() {
-			//collision pair vector.
-			
-
-			//fill zeros
-			for (auto& c : collisionArray)
-				for (auto& cc : c)cc = 0;
-
-			//fill 1 2 3 4 - walls
-			//horisontal walls 1 3
-			for (int x = 0; x < pool_size_w; x++) 
-			{
-				collisionArray[x][0] = 1;
-				collisionArray[x][pool_size_h-1] = 3;
-			}
-			//vertical walls 2 4
-			for (int y = 0; y < pool_size_h; y++)
-			{
-				collisionArray[0][y] = 2;
-			    collisionArray[pool_size_w-1][y] = 4;
-			}
-
-			
-			for (auto& mol : molStates)
-			{
-				//fill mols collision box - square in this implementation
-				for (int32_t i_y = -mol.radius; i_y < mol.radius; i_y++)
-					for (int32_t i_x = -mol.radius; i_x < mol.radius; i_x++)
-				{	
-//fill like circle
-						if ((i_y * i_y + i_x * i_x) > mol.radius * mol.radius)continue;
-
-
-#ifdef TESTT
-	std::cout << "i_x = " << i_x << " = > " 
-		<<" mol.P.x ="<< mol.P.x << " = > "
-		<< i_x + static_cast<int32_t>(mol.P.x - pool_size_x) << std::endl;
-	std::cout << "i_y = " << i_y << " = > " 
-		<<" mol.P.y = "<< mol.P.y<< " = > "
-		<< i_y + static_cast<int32_t>(mol.P.y - pool_size_y) << std::endl;
-#endif
-
-	int32_t x_collide_box_point = i_x + static_cast<int32_t>(mol.P.x - pool_size_x);
-	int32_t y_collide_box_point = i_y + static_cast<int32_t>(mol.P.y - pool_size_y);
-
-	//check if value for collision matrix inside pool
-	if (x_collide_box_point >= 0 &&
-		x_collide_box_point < pool_size_w &&
-		y_collide_box_point >= 0 &&
-		y_collide_box_point < pool_size_h)
-	{
-		//state of point where mol wanna to move
-		int oldState = collisionArray[x_collide_box_point][y_collide_box_point];
-
-		if (oldState == 0)collisionArray[x_collide_box_point][y_collide_box_point] = mol.CollisionId;//if was empty(==0)
-		else if (oldState != mol.lastCollidedObject)//check last collided object
-		{
-		     if (oldState == 1)  collisionVector.push_back({ std::make_pair(mol.CollisionId,1) });//horisontal wall
-		else if (oldState == 2)  collisionVector.push_back({ std::make_pair(mol.CollisionId,2) });//vertical wall 
-		else if (oldState == 3)  collisionVector.push_back({ std::make_pair(mol.CollisionId,3) });//horisontal wall 2
-		else if (oldState == 4)  collisionVector.push_back({ std::make_pair(mol.CollisionId,4) });//vertical wall 2
-		else
-			 if (oldState >= 100)  collisionVector.push_back({ std::make_pair(mol.CollisionId,oldState) });
-		}//check las collided object
-	};
-				     }
-			}
-
-			//delete duplicates
-			auto last = std::unique(collisionVector.begin(), collisionVector.end());
-			collisionVector.erase(last, collisionVector.end());
-	
-			return collisionVector;
-		};
-
-
-		void updateMolStateAfterCollisions()
-		{
-			//for (auto& (*iterCollVec) : collisionVector)
-			for(auto iterCollVec = collisionVector.begin(); iterCollVec !=collisionVector.end(); )
-			{
-#ifdef TEST
-				std::cout << "collision vector: ";
-				for (auto& v : collisionVector)std::cout << v.first << " - " << v.second<<"|";
-				std::cout << std::endl;
-#endif
-				//colliding with horisontal walls
-				if (((*iterCollVec).second == 1)||((*iterCollVec).second == 3))
-				{
-					for (auto& mol : molStates) {
-						if (mol.CollisionId == (*iterCollVec).first) {
-							//mol.D.x *= mol.D.x;
-							mol.D.y *=-1.0f;
-#ifdef TEST
-							std::cout << "mol.CollisionId = " << mol.CollisionId << std::endl;
-							std::cout << "mol.Direction = " << mol.D << std::endl;
-							std::cout << "mol.Position = " << mol.P << std::endl;
-#endif
-							mol.lastCollidedObject = (*iterCollVec).second;
-							break;
-						}
-					
-					}
-					//delete from collision vector because already done
-					iterCollVec=collisionVector.erase(iterCollVec);
-					
-				}
-				//colliding with vertical walls
-				else if (((*iterCollVec).second == 2)||(*iterCollVec).second == 4)
-				{
-
-					for (auto& mol : molStates) {
-						if (mol.CollisionId == (*iterCollVec).first) {
-							mol.D.x *= -1.0f;
-							//mol.D.y *= mol.D.x;
-#ifdef TEST
-							std::cout << "mol.CollisionId = " << mol.CollisionId << std::endl;
-							std::cout << "mol.Direction = " << mol.D << std::endl;
-							std::cout << "mol.Position = " << mol.P << std::endl;
-#endif
-							mol.lastCollidedObject = (*iterCollVec).second;
-							break;
-						}
-
-					}
-					//delete from collision vector because already done
-					iterCollVec = collisionVector.erase(iterCollVec);
-				}
-
-
-				//colliding with mols
-				else if ((*iterCollVec).second >= 100)
-				{
-
-					for (auto& mol : molStates) {
-						if (mol.CollisionId == (*iterCollVec).first) {
-							molState& mol2 = getMollStateByID((*iterCollVec).second);
-
-#ifdef TEST					
-							std::cout << "before update :" << std::endl;;
-							std::cout << "mol.CollisionId = " << mol.CollisionId << std::endl;
-							std::cout << "mol.Direction = " << mol.D << std::endl;
-							std::cout << "mol.Position = " << mol.P << std::endl;
-							std::cout << "mol2.CollisionId = " << mol2.CollisionId << std::endl;
-							std::cout << "mol2.Direction = " << mol2.D << std::endl;
-							std::cout << "mol2.Position = " << mol2.P << std::endl;
-#endif
-							 /*
-							//   https://ru.wikipedia.org/wiki/%D0%A3%D0%B4%D0%B0%D1%80
-						
-							//int gradus = round(acos(mol.D.x / hypot(mol.D.y, mol.D.x)) * 180 / 3.14);
-							//if (mol.D.y > 0)gradus += 180;
-
-							float phi1 = gradus(mol.D) * 3.14 / 180;
-							float phi2 = gradus(mol2.D) * 3.14 / 180;
-
-							float phi = abs(phi1 - phi2);
-
-							mol.D.x = mol2.D.x * cos(phi2 - phi) * cos(phi)+mol.D.x*sin(phi1-phi)*cos(phi+3.14/2);
-							mol.D.y = mol2.D.y * cos(phi2 - phi) * sin(phi) + mol.D.y * sin(phi1 - phi) * cos(phi + 3.14 / 2);
-
-							mol2.D.x = mol.D.x * cos(phi1 - phi) * cos(phi) + mol2.D.x * float(sin(phi2 - phi)) * cos(phi + 3.14 / 2);
-							mol2.D.y = mol.D.y * cos(phi1 - phi) * sin(phi) + mol2.D.y * sin(phi2 - phi) * cos(phi + 3.14 / 2);
-
-
-							if (mol.D.x > 100.0f)mol.D.x = 10.0f;
-							if (mol.D.x < -100.0f)mol.D.x = -100.0f;
-
-							if (mol.D.y > 100.0f)mol.D.y = 100.0f;
-							if (mol.D.y < -100.0f)mol.D.y = -100.0f;
-
-
-							if (mol2.D.x > 100.0f)mol2.D.x = 10.0f;
-							if (mol2.D.x < -100.0f)mol2.D.x = -100.0f;
-
-							if (mol2.D.y > 100.0f)mol2.D.y = 100.0f;
-							if (mol2.D.y < -100.0f)mol2.D.y = -100.0f;
-
-						////////////////////////////////////////////////
-
-							*/
-							//mol.D.x *= -1.f;
-							//mol.D.y *= -1.f;
-							//mol2.D.y *= -1.f;
-							//mol2.D.x *= -1.f;
-
-
-#ifdef TEST					
-							std::cout << "after update: " << std::endl;;
-							std::cout << "mol.CollisionId = " << mol.CollisionId << std::endl;
-							std::cout << "mol.Direction = " << mol.D << std::endl;
-							std::cout << "mol.Direction angle = "<< atan(mol.D.y / mol.D.x) << std::endl;
-							std::cout << "mol.Position = " << mol.P << std::endl;
-							std::cout << "mol2.CollisionId = " << mol2.CollisionId << std::endl;
-							std::cout << "mol2.Direction = " << mol2.D << std::endl;
-							std::cout << "mol2.Position = " << mol2.P << std::endl;
-
-#endif
-							mol.lastCollidedObject = mol2.CollisionId;
-							mol2.lastCollidedObject = mol.CollisionId;
-							//delete from collision vector because already done
-							iterCollVec = collisionVector.erase(iterCollVec);
-							//exit after one time done
-							break;
-						}
-
-					}
-				}
-				else {iterCollVec++;}
-
-			}
-
-
-			collisionVector.clear();
-		
-		}
-
-#ifdef SHOW_COLLISION_ARRAY
-
-		void printCollisionMatrix() {
-
-			for (int i = 0; i < pool_size_h; i++)
-			{
-				//std::cout << std::endl;
-				for (int j = 0; j < pool_size_w; j++) {
-
-					if (collisionArray[i][j] == 0)
-					{
-						Draw(i+120, j+480, olc::BLUE);
-						//std::cout << "x";
-					}
-
-					if (collisionArray[i][j] >= 100)
-					{ 
-						Draw(i+120, j+480, olc::RED);
-						//std::cout << "a";
-					}
-
-					if (collisionArray[i][j] == 1|| collisionArray[i][j] == 2 || collisionArray[i][j] == 3 || collisionArray[i][j] == 4)
-					{
-						Draw(i + 120, j + 480, olc::RED);
-						//std::cout << "a";
-					}
-				
-					
-				}
-			}
-			
-		}
+#ifdef SHOW_TEST_INFO
 
 		void printMolStates() {
 			int step = 0;
+			auto drawPos = pool_size_h + SCREEN_OFFSET + SCREEN_OFFSET+button_panel_side;
 			for(auto& m:molStates)
 			{ 
-				DrawString(640, (step++)*50,
+				DrawString(SCREEN_OFFSET, drawPos +(step++)*20,
 					std::string("ID: "+ 
-						std::to_string(m.CollisionId)+
+						std::to_string(m.Id)+
 						" P: "+
 						std::to_string(m.P.x) +" "+ std::to_string(m.P.y) +
 						" D: " +
-						std::to_string(m.D.x) + " " + std::to_string(m.D.y)+
-						" last collided:" +
-						std::to_string(m.lastCollidedObject))
+						std::to_string(m.D.x) + " " + std::to_string(m.D.y))
 
 					,olc::BLACK,1);
 				
 			}
+
+
+			for (auto& c : collisionVector)
+			{
+				DrawString(SCREEN_OFFSET, drawPos +(step++) * 20,
+					std::string(
+								 " ID1: " + std::to_string(c.first->Id) +
+								" ID2: " + std::to_string(c.second->Id))
+						
+
+					, olc::BLACK, 1);
+
+			}
+
+
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("colvec.size: " + std::to_string(collisionVector.size()))
+
+
+				, olc::BLACK, 1);
 		}
 
 
 #endif
 
-		const int32_t getCollisionName() {
+		const int32_t getId() {
 			static int32_t name = 100;
 
 			return name++;
@@ -472,37 +455,49 @@ std::vector<std::pair<int32_t, int32_t>> updateCollisionArray() {
 
 	
 
-		struct molState {
+		class molState {
+		public:
 			molecules molObj;
 			olc::Pixel molColor;
 			olc::vf2d P; //Possition;
 			olc::vf2d D; //Dirrection- Speed
 			olc::vf2d A; //Accel;
 			int32_t radius;
-			int32_t CollisionId;
+			int32_t Id;
+			float mass;
 			//0 - empty cell
 			//1 - horisontal walls
 			//2 - vertical walls
 			//100-10000 - particles
-			int32_t lastCollidedObject;
+
+			//friend bool operator==(const molState& mol1, const molState& mol2);
 		};
+
+		
 
 		molState& getMollStateByID(int32_t collisionId) {
 
-			for (auto& s : molStates)if(s.CollisionId == collisionId)return s;
+			for (auto& s : molStates)if(s.Id == collisionId)return s;
 
 		}
-	private:
-		std::vector<std::pair<int32_t, int32_t>> collisionVector;
 
-		std::vector<molState> molStates;
+	private:
+	
+		 std::vector<std::pair<molState*,molState*>> collisionVector;
+		 std::vector<molState> molStates;
 
 		int32_t pool_size_x,
-			pool_size_y,
-			pool_size_w,
-			pool_size_h;
+				pool_size_y,
+				pool_size_w,
+				pool_size_h,
+				left_pool_width,
+				left_pool_height,
+				right_pool_width,
+				right_pool_height,
+				button_panel_side;
 
-		std::array<std::array<int32_t, 400>, 400> collisionArray;
+
+		molState* pSelectedMol=nullptr;
 
 
 //////////////////////////////////////////////////////
@@ -533,11 +528,10 @@ int main()
 	random_generator R;
 	R.rand_init(640,480);
 
-	for (int i = 0; i < 100; i++) {
+	//for (int i = 0; i < 100; i++) {
 	
 		//std::cout << "RAND= " << RAND << " RAND_W = "<< RAND_W <<" RAND_H = " << RAND_H << " RAND100 = "<< RAND100<<std::endl;
-		std::cout << "RAND_SIGN " << RAND_SIGN << std::endl;
-	}
+		//std::cout << "RAND_SIGN " << RAND_SIGN << std::endl;}
 
 	//end of Inits
 
@@ -550,6 +544,4 @@ int main()
 
 	return 0;
 }
-
-//update and draw possitions of moleculas
 

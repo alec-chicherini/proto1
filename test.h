@@ -6,16 +6,20 @@
 
 
 //adds ne screen under main to check collisions
-#define SHOW_COLLISION_ARRAY
+#define SHOW_TEST_INFO
 
-#ifdef SHOW_COLLISION_ARRAY
-	#define SCREEN_SIZE_X 1640
+#ifdef SHOW_TEST_INFO
+	#define SCREEN_SIZE_X 1280
 	#define SCREEN_SIZE_Y 1000
+	#define TARGET_SCREEN_SIZE_X 1280
+	#define TARGET_SCREEN_SIZE_Y 720
 #endif
 
-#ifndef SHOW_COLLISION_ARRAY
-#define SCREEN_SIZE_X 640
-#define SCREEN_SIZE_Y 480
+#ifndef SHOW_TEST_INFO
+	#define SCREEN_SIZE_X 1280
+	#define SCREEN_SIZE_Y 720
+	#define TARGET_SCREEN_SIZE_X SCREEN_SIZE_X
+	#define TARGET_SCREEN_SIZE_Y SCREEN_SIZE_Y
 #endif
 
 #include <iostream>
