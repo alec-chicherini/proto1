@@ -13,7 +13,7 @@ csv_to_RECIPIES::csv_to_RECIPIES(std::string FILE)
 #ifndef TEST
     throw(std::exception("FILE WITH RECEPIES NOT OPPENED"));
 #endif // !TEST
-
+    else {
     std::string s;
     for (file >> s; !file.eof(); file >> s) {
 #ifdef TEST
@@ -33,6 +33,7 @@ csv_to_RECIPIES::csv_to_RECIPIES(std::string FILE)
         //insert recepie
         RECIPIES.insert({ s1 + s2,s3 });
         RECIPIES.insert({ s2 + s1,s3 });
+    }
     };
 }
 

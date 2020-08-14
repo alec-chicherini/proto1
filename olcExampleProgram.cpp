@@ -28,6 +28,8 @@ private:
 	
 	molecules H2 = { "H2" };
 	molecules CO2 = { "CO2" };
+	molecules Cl2 = { "Cl2" };
+	class molState;
 
 public:
 	
@@ -46,6 +48,7 @@ public:
 
 		addMol(H2);
 		addMol(CO2);
+		addMol(Cl2);
 
 		return true;
 	}
@@ -55,15 +58,18 @@ public:
 
 		if (GetKey(olc::Key::K1).bPressed)	addMol(H2);
 		if (GetKey(olc::Key::K2).bPressed)	addMol(CO2);
+		if (GetKey(olc::Key::K3).bPressed)	addMol(Cl2);
 
 		mouseControlling();
 		molStateUpdate(fElapsedTime);
 		molCollisionUpdate();
+		molIteractions();
 		molStaticCollisions();
 		molDynamicCollisions();
 		Clear(olc::WHITE);
 		DrawPool();
 		DrawMols();
+		DrawStatistics();
 
 
 #ifdef SHOW_TEST_INFO
@@ -91,7 +97,6 @@ public:
 		//update UI
 		void DrawPool() {
 		
-			
 			//main pool
 			DrawRect(pool_size_x, pool_size_y, pool_size_w, pool_size_h, olc::BLACK);
 
@@ -104,8 +109,6 @@ public:
 			//Draw button1
 			DrawRect(SCREEN_OFFSET, pool_size_h + SCREEN_OFFSET, left_pool_width, button_panel_side, olc::BLACK);
 			DrawString(SCREEN_OFFSET + left_pool_width/2, pool_size_h + SCREEN_OFFSET + button_panel_side/2, "BUTTON1", olc::BLACK);
-
-
 
 
 		}
@@ -126,7 +129,8 @@ public:
 #endif // !SHOW_TEST_INFO
 
 #ifdef SHOW_TEST_INFO
-					std::to_string(mol.Id),
+					mol.molObj.get_name(),
+					//std::to_string(mol.Id),
 #endif // SHOW_TEST_INFO
 					mol.molColor, 1);
 			}
@@ -141,6 +145,32 @@ public:
 				DrawLine(pSelectedMol->P.x, pSelectedMol->P.y,GetMouseX(), GetMouseY(),olc::BLACK);
 			}
 		}
+
+
+
+		void DrawStatistics() 
+		{
+		
+			int step = 0;
+
+			auto drawPosX = pool_size_w + SCREEN_OFFSET + SCREEN_OFFSET + left_pool_width;
+			
+
+				for(auto& m:molStatistics)
+				{
+					DrawString(drawPosX, SCREEN_OFFSET+SCREEN_OFFSET +(step++)*10,
+						std::string(m.first +
+							" - "+
+							std::to_string(m.second)
+									)
+
+						,olc::BLACK,1);
+
+				}
+
+		
+		}
+
 		void molStateUpdate(float fElapsedTime) {
 
 			for (auto& mol : molStates) {
@@ -169,7 +199,7 @@ public:
 
 		void molCollisionUpdate()
 		{
-
+			//return true if mols will overlap this frame
 			auto isMolOverlap = [](molState& mol1, molState& mol2) {
 				return ((mol1.radius + mol2.radius) * (mol1.radius + mol2.radius)) >=
 					((mol1.P.x - mol2.P.x) * (mol1.P.x - mol2.P.x) + (mol1.P.y - mol2.P.y) * (mol1.P.y - mol2.P.y)); };
@@ -177,9 +207,10 @@ public:
 			for (auto& mol1 : molStates)
 				for (auto& mol2 : molStates)
 				{
+					//not check mol for itself
 					if (mol1.Id != mol2.Id)
 					{
-						
+						//if mol pair already in current collision array dont add new pair
 						auto search = std::find_if(
 							collisionVector.begin(),
 							collisionVector.end(),
@@ -189,22 +220,63 @@ public:
 							}
 						);
 
+						//if two molls overlapping add it on collision vector to process
 						if (isMolOverlap(mol1, mol2))
 						{
-							if (search == collisionVector.end())
+
+							if ((mol1.molObj + mol2.molObj).get_name() != "NULL")
+							{
+
+								auto searchItVec = std::find_if(
+									iteractionVector.begin(),
+									iteractionVector.end(),
+									[&mol1, &mol2](std::pair<int32_t, int32_t>& currentIteration)
+									{
+										return (currentIteration.first==mol2.Id)&& (currentIteration.second == mol1.Id);
+									});
+
+								if(searchItVec == iteractionVector.end()){
+									iteractionVector.push_back(std::make_pair(mol1.Id, mol2.Id));
+#ifdef TEST
+								//std::cout << "iteration vector size= " << iteractionVector.size() << std::endl;
+#endif
+								}
+							}
+
+
+							else if(search == collisionVector.end())
 							{
 									collisionVector.push_back(std::make_pair(&mol1,&mol2));
 								}
 						}
 						else
 						{
+							//if already not and exist pair still exist in collisionvector - erease this pair
 							if(search!=collisionVector.end()) collisionVector.end()=collisionVector.erase(search);
 						}
 					}
 				}
-
-
 		};
+
+		void molIteractions()
+		{
+
+			for (auto& i : iteractionVector)
+			{
+				auto mol1 = molIterById(i.first);
+				auto mol2 = molIterById(i.second);
+
+			addMol(mol1->molObj + mol2->molObj,
+				   (mol1->P + mol2->P) / 2.0f,
+				   (mol1->D + mol2->D) / 2.0f);
+				
+			removeMol(i.first);
+			removeMol(i.second);
+			}
+			iteractionVector.clear();
+		
+		};
+
 
 		void molStaticCollisions() {
 
@@ -360,10 +432,11 @@ public:
 		
 		}
 
-		//create mol in pool at random position
-		void addMol(molecules mol) 
+		//create mol - super add
+		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction,
+			        olc::vf2d acceleration,int32_t radius, olc::Pixel color, float mass)
 		{
-			int32_t radius=15;
+
 			olc::vf2d CurrentPos;
 			int32_t randX = RAND_X%pool_size_w;
 			int32_t randY = RAND_Y%pool_size_h;
@@ -379,27 +452,115 @@ public:
 			molState currentMolState =
 			{
 			mol,
-			olc::BLACK,
-				
-			{static_cast<float>(CurrentPos.x),//possition x
-			static_cast<float>(CurrentPos.y)},//possition y
-
-			{0,0},
-			//{sin(static_cast<float>(RAND100)) * 10,//direction(speed) x
-			 //sin(static_cast<float>(RAND100)) * 10},//direction(speed)  y
-
-			{0,0},//Acceleration x,y
-			30,//radius
+			color,
+			position,//possition x,y
+			direction,
+			acceleration,//Acceleration x,y
+			radius,//radius
 			getId(),// ID
-			1.0f//mass
-			
-
+			mass//mass
 			};
-
+			
 			molStates.push_back(currentMolState);
+
+
+			auto val = [&]() {
+				auto search = molStatistics.find(mol.get_name());
+				if (search == molStatistics.end()) return int32_t(1);
+				else return int32_t(search->second + 1);
+				};
+
+			molStatistics.insert_or_assign(mol.get_name(), val());
+				
+				
 		
 		
 		};
+
+		//add at  possition with direction
+		void addMol(molecules mol, olc::vf2d position, olc::vf2d direction)
+		{
+
+			addMol(mol,
+				position,//possition x y
+				direction,//direction aka velocity vector
+				{ 0,0 },//acceleration 
+				20, //radius
+				olc::BLACK,
+				1.f);
+
+		};
+
+		//add at random possition with some attributes
+		void addMol(molecules mol)
+		{
+			int32_t radius = 30;
+			olc::vf2d CurrentPos;
+			int32_t randX = RAND_X % pool_size_w;
+			int32_t randY = RAND_Y % pool_size_h;
+
+			if (randX <= radius)CurrentPos.x = radius + pool_size_x;
+			else if (randX >= pool_size_w - radius)CurrentPos.x = pool_size_x + pool_size_w - radius;
+			else	CurrentPos.x = randX + pool_size_x;
+
+			if (randY <= radius)CurrentPos.y = radius + pool_size_y;
+			else if (randY >= pool_size_h - radius)CurrentPos.y = pool_size_h - radius + pool_size_y;
+			else	CurrentPos.y = randY + pool_size_y;
+
+			addMol(mol,
+				{ static_cast<float>(CurrentPos.x), static_cast<float>(CurrentPos.y) },//possition x y
+				{ 0,0 },//direction aka velocity vector
+				{ 0,0 },//acceleration 
+				20, //radius
+				olc::BLACK,
+				1.f);
+				  
+		};
+
+
+		inline const std::vector<experiment_proto::molState>::iterator molIterById(int32_t &id)
+		{
+			auto search = std::find_if(
+				molStates.begin(),
+				molStates.end(),
+				[&id](molState& mol) {return mol.Id == id; });
+
+			return search;
+		}
+
+/*
+		 molecules molById(int32_t& id)
+		{
+				   auto search = std::find_if(
+								 molStates.begin(),
+								 molStates.end(),
+								 [&id](molState& mol) {return mol.Id == id;});
+
+				   auto mol = (*search).molObj;
+
+				   return mol;
+		}
+	*/	
+
+
+		void removeMol(int32_t &id)
+		{
+			auto search = molIterById(id);
+			if (search != molStates.end()) 
+			{
+				auto val =[&]() {
+					auto search2 = molStatistics.find(search->molObj.get_name());
+					return search2->second - 1;
+					};
+
+				molStatistics.insert_or_assign(search->molObj.get_name(), val());
+					
+
+				molStates.end() = molStates.erase(search);
+			};
+
+		}
+
 
 		//void addMaterial(material mat) {};
 
@@ -408,7 +569,10 @@ public:
 
 		void printMolStates() {
 			int step = 0;
+
 			auto drawPos = pool_size_h + SCREEN_OFFSET + SCREEN_OFFSET+button_panel_side;
+		/*
+		
 			for(auto& m:molStates)
 			{ 
 				DrawString(SCREEN_OFFSET, drawPos +(step++)*20,
@@ -423,7 +587,7 @@ public:
 				
 			}
 
-
+		
 			for (auto& c : collisionVector)
 			{
 				DrawString(SCREEN_OFFSET, drawPos +(step++) * 20,
@@ -437,11 +601,50 @@ public:
 			}
 
 
-			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+						DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("colvec.size: " + std::to_string(collisionVector.size()))
+				, olc::BLACK, 1);
+			*/
+
+			for (auto& m : molStates)
+			{
+				DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+					std::string(
+						" ID1: " + std::to_string(m.Id) +
+						" ID2: " + m.molObj.get_name())
+						, olc::BLACK, 1);
+
+			}
+
+
+
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("molStates.size: " + std::to_string(molStates.size()))
+				, olc::BLACK, 1);
+
+
+
+			for (auto& i : iteractionVector)
+			{
+				DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+					std::string(
+						" ID1: " + std::to_string(i.first) +
+						" ID2: " + std::to_string(i.second))
+						, olc::BLACK, 1);
+			}
+
+
+
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("iteractionVector.size: " + std::to_string(iteractionVector.size()))
 
 
 				, olc::BLACK, 1);
+
+			//iteractionVector
+
+
+
 		}
 
 
@@ -454,7 +657,7 @@ public:
 		}
 
 	
-
+private:
 		class molState {
 		public:
 			molecules molObj;
@@ -469,11 +672,8 @@ public:
 			//1 - horisontal walls
 			//2 - vertical walls
 			//100-10000 - particles
-
 			//friend bool operator==(const molState& mol1, const molState& mol2);
 		};
-
-		
 
 		molState& getMollStateByID(int32_t collisionId) {
 
@@ -481,10 +681,12 @@ public:
 
 		}
 
-	private:
+
 	
 		 std::vector<std::pair<molState*,molState*>> collisionVector;
+		 std::vector<std::pair<int32_t, int32_t>> iteractionVector;
 		 std::vector<molState> molStates;
+		 std::map<std::string, int32_t> molStatistics;
 
 		int32_t pool_size_x,
 				pool_size_y,
@@ -523,7 +725,7 @@ std::vector<int> random_generator::vRandSign = { {} };
 int main()
 {
 	//Initialisations of Experiment Engine
-	csv_to_RECIPIES::csv_to_RECIPIES("X:\\Downloads\\recep.csv");
+	csv_to_RECIPIES::csv_to_RECIPIES("recep.csv");
 
 	random_generator R;
 	R.rand_init(640,480);
