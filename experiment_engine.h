@@ -9,14 +9,13 @@
 #include <iostream>
 #include <vector>
 
-
-
+//testing class to making iterractions with molecules and materials and output to command window.
 class theExperimentEngine
 {
 private: 
 
 public:
-
+	
 	material makeExperiment(material& mat1, material& mat2);
 
 
