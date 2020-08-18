@@ -17,7 +17,7 @@ csv_to_RECIPIES::csv_to_RECIPIES(std::string FILE)
     std::string s;
     for (file >> s; !file.eof(); file >> s) {
 #ifdef TEST
-        std::cout << s << std::endl;
+       // std::cout << s << std::endl;
 #endif
         std::string s1, s2, s3;
 
@@ -27,7 +27,7 @@ csv_to_RECIPIES::csv_to_RECIPIES(std::string FILE)
 
 
 #ifdef TEST
-        std::cout << s1 << ' ' << s2 << ' ' << s3 << ' ' << std::endl;
+       // std::cout << s1 << ' ' << s2 << ' ' << s3 << ' ' << std::endl;
 #endif
 
         //insert recepie
@@ -37,8 +37,13 @@ csv_to_RECIPIES::csv_to_RECIPIES(std::string FILE)
     };
 }
 
+csv_to_RECIPIES::csv_to_RECIPIES()
+{
+}
+
 void csv_to_RECIPIES::print_RECIPIES()
 {
-    std::cout << "RECEPIES:" << std::endl;
+    std::cout << "|RECEPIES:" << std::endl;
     for (auto& s : RECIPIES) std::cout << "|" << s.first << "|" << s.second << "|"<< std::endl;
+    std::cout << "|END OF RECEPIES|" << std::endl;
 }

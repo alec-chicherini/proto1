@@ -306,7 +306,7 @@ namespace olc
 	};
 
 	Pixel PixelF(float red, float green, float blue, float alpha = 1.0f);
-
+	
 
 
 	// O------------------------------------------------------------------------------O

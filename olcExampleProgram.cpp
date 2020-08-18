@@ -26,9 +26,9 @@ class experiment_proto : public olc::PixelGameEngine
 private:
 	
 	
-	molecules H2 = { "H2" };
-	molecules CO2 = { "CO2" };
-	molecules Cl2 = { "Cl2" };
+	molecules A = { "2Al" };
+	molecules B = { "6H20" };
+	molecules C = { "Cl2" };
 	class molState;
 
 public:
@@ -46,19 +46,19 @@ public:
 		poolInit();
 		Clear(olc::WHITE);
 
-		addMol(H2);
-		addMol(CO2);
-		addMol(Cl2);
+		addMol(A);
+		addMol(B);
+		addMol(C);
 
 		return true;
 	}
 
-	bool OnUserUpdate(float fElapsedTime) override
+	bool OnUserUpdate(float fElapsedTime)
 	{
 
-		if (GetKey(olc::Key::K1).bPressed)	addMol(H2);
-		if (GetKey(olc::Key::K2).bPressed)	addMol(CO2);
-		if (GetKey(olc::Key::K3).bPressed)	addMol(Cl2);
+		if (GetKey(olc::Key::K1).bPressed)	addMol(A);
+		if (GetKey(olc::Key::K2).bPressed)	addMol(B);
+		if (GetKey(olc::Key::K3).bPressed)	addMol(C);
 
 		mouseControlling();
 		molStateUpdate(fElapsedTime);
@@ -80,6 +80,8 @@ public:
 		//collisionVector.clear();
 		return true;
 	}
+
+	
 
 	
 	//void inline  DrawMaterial(olc::vf2d* pos, material& mat, olc::Pixel clr)
@@ -224,7 +226,7 @@ public:
 						if (isMolOverlap(mol1, mol2))
 						{
 
-							if ((mol1.molObj + mol2.molObj).get_name() != "NULL")
+							if ((mol1.molObj.is_recepie_with(mol2.molObj)))
 							{
 
 								auto searchItVec = std::find_if(
@@ -258,24 +260,54 @@ public:
 				}
 		};
 
+
+//chemical iterations. creating new  moleculas or destroy old  
+
 		void molIteractions()
 		{
 
 			for (auto& i : iteractionVector)
 			{
-				auto mol1 = molIterById(i.first);
-				auto mol2 = molIterById(i.second);
+				const auto const mol1 = molIterById(i.first);
+				const auto const mol2 = molIterById(i.second);
 
-			addMol(mol1->molObj + mol2->molObj,
-				   (mol1->P + mol2->P) / 2.0f,
-				   (mol1->D + mol2->D) / 2.0f);
-				
-			removeMol(i.first);
-			removeMol(i.second);
+				std::vector<molecules> sum(mol1->molObj + mol2->molObj);
+#ifdef  TEST
+				std::cout << "molIteractions::sum.size() = " << sum.size() << std::endl;
+				for (auto& r : sum)
+				{
+					std::cout << r.get_name() << "|";
+
+				}
+				std::cout << std::endl;
+#endif //  TEST
+				auto pos_middle = (mol1->P + mol2->P) / 2.0f;
+				auto dir_middle = (mol1->D + mol2->D) / 2.0f;
+				int molNum = 0;
+				for (molecules& s : sum)
+				{
+
+					//radius of new group of molecules circle
+					float R=0;
+					for (molecules& r : sum)R += 35;
+					R /= 3.14f;
+
+					float segSize = 2*3.14/sum.size();
+					olc::vf2d rotVec={ R * cos(segSize * molNum),
+									   R *sin(segSize * molNum)};
+
+					auto pos = pos_middle + rotVec;
+
+					addMol(s, pos, dir_middle);
+					molNum++;
+				}
+
+				removeMol(i.first);
+				removeMol(i.second);
 			}
 			iteractionVector.clear();
-		
-		};
+
+		}
 
 
 		void molStaticCollisions() {
@@ -434,33 +466,49 @@ public:
 
 		//create mol - super add
 		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction,
-			        olc::vf2d acceleration,int32_t radius, olc::Pixel color, float mass)
+			        olc::vf2d acceleration, olc::Pixel color, float mass)
 		{
 
 			olc::vf2d CurrentPos;
 			int32_t randX = RAND_X%pool_size_w;
 			int32_t randY = RAND_Y%pool_size_h;
 
-			if (randX <= radius)CurrentPos.x = radius+ pool_size_x;
-			else if (randX >= pool_size_w - radius)CurrentPos.x = pool_size_x+pool_size_w - radius;
+			if (randX <= mol.get_radius())CurrentPos.x = mol.get_radius() + pool_size_x;
+			else if (randX >= pool_size_w - mol.get_radius())CurrentPos.x = pool_size_x+pool_size_w - mol.get_radius();
 			else	CurrentPos.x = randX+ pool_size_x;
 
-			if (randY<= radius)CurrentPos.y = radius+ pool_size_y;
-			else if (randY >= pool_size_h - radius)CurrentPos.y = pool_size_h - radius+ pool_size_y;
+			if (randY<= mol.get_radius())CurrentPos.y = mol.get_radius() + pool_size_y;
+			else if (randY >= pool_size_h - mol.get_radius())CurrentPos.y = pool_size_h - mol.get_radius() + pool_size_y;
 			else	CurrentPos.y = randY+ pool_size_y;
 
 			molState currentMolState =
 			{
 			mol,
-			color,
+			olc::Pixel(mol.get_color()[0],mol.get_color()[1],mol.get_color()[2]),
 			position,//possition x,y
 			direction,
 			acceleration,//Acceleration x,y
-			radius,//radius
+			mol.get_radius(),//radius
 			getId(),// ID
 			mass//mass
 			};
 			
+			/*
+				molecules molObj;
+			olc::Pixel molColor;
+			olc::vf2d P; //Possition;
+			olc::vf2d D; //Dirrection- Speed
+			olc::vf2d A; //Accel;
+			int32_t radius;
+			int32_t Id;
+			float mass;
+			//0 - empty cell
+			//1 - horisontal walls
+			//2 - vertical walls
+			//100-10000 - particles
+			//friend bool operator==(const molState& mol1, const molState& mol2);
+
+			*/
 			molStates.push_back(currentMolState);
 
 
@@ -478,21 +526,20 @@ public:
 		};
 
 		//add at  possition with direction
-		void addMol(molecules mol, olc::vf2d position, olc::vf2d direction)
+		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction)
 		{
 
 			addMol(mol,
 				position,//possition x y
 				direction,//direction aka velocity vector
 				{ 0,0 },//acceleration 
-				20, //radius
 				olc::BLACK,
 				1.f);
 
 		};
 
 		//add at random possition with some attributes
-		void addMol(molecules mol)
+		void addMol(molecules& mol)
 		{
 			int32_t radius = 30;
 			olc::vf2d CurrentPos;
@@ -511,7 +558,7 @@ public:
 				{ static_cast<float>(CurrentPos.x), static_cast<float>(CurrentPos.y) },//possition x y
 				{ 0,0 },//direction aka velocity vector
 				{ 0,0 },//acceleration 
-				20, //radius
+
 				olc::BLACK,
 				1.f);
 				  
@@ -643,8 +690,6 @@ public:
 
 			//iteractionVector
 
-
-
 		}
 
 
@@ -709,6 +754,7 @@ private:
 
 //static vars init
 std::map<std::string, std::string> csv_to_RECIPIES::RECIPIES{ {"NULL","NULL" } };
+std::map<std::string, std::vector<int32_t>> molecules::MOLS{ {"NULL",{} } };
 int random_generator::iRand100 = 0;
 int random_generator::iRand = 0;
 int random_generator::iRandH = 0;
@@ -726,7 +772,16 @@ int main()
 {
 	//Initialisations of Experiment Engine
 	csv_to_RECIPIES::csv_to_RECIPIES("recep.csv");
+#ifdef TEST
+	csv_to_RECIPIES rcp;
+	rcp.print_RECIPIES();
+#endif
+	molecules init;
+	init.csv_to_MOLS("mols.csv");
 
+#ifdef TEST
+	init.print_MOLS();
+#endif
 	random_generator R;
 	R.rand_init(640,480);
 
@@ -747,3 +802,4 @@ int main()
 	return 0;
 }
 
+ 

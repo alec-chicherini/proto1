@@ -57,14 +57,16 @@ material theExperimentEngine::makeExperiment(material& mat1, material& mat2)
 			std::cout << i<<":|" << molFromSmall << "|" << " + " << "|" << molFromBig << "|" << " = ";
 
 #endif // TEST
-			molecules sum (molecules(molFromSmall) + molecules(molFromBig));
+			auto sum (molecules(molFromSmall) + molecules(molFromBig));
 			//std::cout << "|" << (sum).get_name() << "|" << std::endl;
-			if (sum.get_name() != "NULL"){
-				res.add_1_mol(sum);
+			if (sum.back().get_name() != "NULL"){
+				for (auto& m : sum) {
+					res.add_1_mol(m);
 
 #ifdef TEST
-				std::cout << "|" << (sum).get_name()<<"|"<<std::endl;
+					std::cout << "|" << m.get_name() << "|" << std::endl;
 #endif // TEST
+				}
 			}
 
 			else {

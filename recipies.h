@@ -20,9 +20,10 @@
 class csv_to_RECIPIES {
 public:
 	
-	static std::map<std::string, std::string> RECIPIES;
+	  static std::map<std::string, std::string> RECIPIES;
 	//parse csv file to RECIPIES variable
 	csv_to_RECIPIES(std::string  FILE);
+	csv_to_RECIPIES();
 
 	void print_RECIPIES();
 };

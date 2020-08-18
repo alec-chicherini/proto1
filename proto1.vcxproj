@@ -155,9 +155,14 @@
     <ClInclude Include="material.h" />
     <ClInclude Include="molecules.h" />
     <ClInclude Include="olcExampleProgram.h" />
+    <ClInclude Include="olcPixelGameEngine.h" />
     <ClInclude Include="random_generator.h" />
     <ClInclude Include="recipies.h" />
     <ClInclude Include="test.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="mols.csv" />
+    <None Include="recep.csv" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

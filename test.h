@@ -2,7 +2,7 @@
 
 //#define IN_CONSOLE
 
-//#define TEST
+#define TEST
 
 
 //adds ne screen under main to check collisions
