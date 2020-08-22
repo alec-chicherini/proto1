@@ -1,25 +1,59 @@
 #include "molecules.h"
 #include "recipies.h"
+
 molecules::molecules(std::string _name)
 {
 	name = _name;
+	
+	auto str = _name;
+	int32_t num;
 
-	auto search = molecules::MOLS.find(_name);
-	if (search != molecules::MOLS.end())
+	parseMol(str, num);
+
+	if(num==1)
 	{
+	auto search = molecules::MOLS.find(str);
+	if (search != molecules::MOLS.end())
+		{
 		radius = search->second[0];
 		R = search->second[1];
 		G = search->second[2];
 		B = search->second[3];
-	}
+		lifetime = search->second[4];
+		}
 	else {
 		radius = 20;
 		R = 0;
 		G = 0;
 		B = 0;
-
+		lifetime = -1;
+		}
 	}
-
+	else //if number of molecules in one more than 1.
+	{
+		auto searchX = molecules::MOLS.find("*"+str);
+		auto search = molecules::MOLS.find(str);
+		if ((search != molecules::MOLS.end())&& 
+			(searchX != molecules::MOLS.end()))
+		{
+			//values of molecules depends on number of mols. Growing values consists in *H20.
+			radius = search->second[0]+searchX->second[0]*num;
+			if (radius > MAX_MOL_RADIUS)radius = MAX_MOL_RADIUS;
+			R = (search->second[1]+ searchX->second[1])/2;
+			G = (search->second[2]+ searchX->second[2])/2;
+			B = (search->second[3]+ search->second[3])/2;
+			lifetime = (searchX->second[4])/num;
+			std::cout<<std::endl; 
+		}
+		else {
+			radius = 20;
+			R = 0;
+			G = 0;
+			B = 0;
+			lifetime = -1;
+		}
+	
+	}
 }
 
 molecules::molecules(const molecules& mol)
@@ -29,15 +63,23 @@ molecules::molecules(const molecules& mol)
 	this->R = mol.R;
 	this->G = mol.G;
 	this->B = mol.B;
+	this->lifetime = mol.lifetime;
 }
 
-molecules::molecules() {};
+molecules::molecules() {
+	this->R = 0;
+	this->G = 0;
+	this->B = 0;
+	this->lifetime = -1;
+};
 
 
  std::vector<molecules> molecules::operator+(const molecules& mol2)
  {
+
 	 std::vector<molecules> res;
 	 
+
 	 std::string sum_res((this->name) + (mol2.name));
 #ifdef TEST
 	// std::cout << " operator+ -> (this->name)+(mol2.name) = " << "|" << sum_res << "|" << std::endl;
@@ -123,26 +165,108 @@ molecules::molecules() {};
 		
 	else {
 
+		//parse molecules like for making operrations like H20+H20 = 2H20
+		std::string firstName=this->name, 
+					secondName=mol2.name;
+		int32_t firstNum(0), secondNum(0);
+
+		//max mol size = 99999H20
+		parseMol(firstName, firstNum);
+		parseMol(secondName, secondNum);
+
+
+#ifdef TEST
+		//std::cout << "PARSE MOL RESULT::" << "this->name=|" << this->name <<"|"<< std::endl;
+		//std::cout << "PARSE MOL RESULT::" << "firstName=|" << firstName << "|firstNum=|" << firstNum <<"|" << std::endl;
+		//std::cout << "PARSE MOL RESULT::" << "mol2.name=|" << mol2.name <<"|" << std::endl;
+		//std::cout << "PARSE MOL RESULT::" << "secondName=|" << secondName << "|secondNum=|" << secondNum <<"|" << std::endl;
+#endif
+
+		if(firstName==secondName)
+		res.push_back(molecules(std::to_string(firstNum + secondNum) + firstName));
+		else{
 		//if comparision didnt find return empty vec
 		//res.push_back(molecules(std::string("NULL")));
 #ifdef  TEST
 		std::cout << "operator+::res NULL Vector returned:  " << res.size() << std::endl;
 
 #endif //  TEST
+		}
 		return res;
 	}	
 		
 	
 }
 
- bool molecules::is_recepie_with(const molecules& mol2)
+std::vector<molecules> molecules::decay()
+{
+	std::vector<molecules> res;
+
+	std::string str=this->name;
+	int32_t num;
+
+	parseMol(str, num);
+	auto total = num;
+
+	//res.push_back(molecules(str));
+	//res.push_back(molecules(std::to_string(num - 1) + str));
+
+	//decay to random number of parts
+	auto parts = (RAND % 5);
+	if (parts > num)parts = num;
+	if (parts < 2)parts = 2;
+
+	for(int i=0;i<parts;i++)
+		{ 
+		auto thisPart = num / parts;
+		if(thisPart == 1)
+		res.push_back(molecules(str));
+		else
+		res.push_back(molecules(std::to_string(thisPart) + str));
+		total -= thisPart;
+
+		if((i==(parts-1))&& total !=0)
+		res.push_back(molecules(std::to_string(total) + str));
+		}
+
+#ifdef TEST
+
+	std::cout << "molecules::decay()::name()-> " << this->name << " decaying to:|";
+	for (auto& r : res)std::cout << r.name<<"|";
+	std::cout << std::endl;
+
+#endif TEST
+
+
+
+
+	return res;
+}
+
+ bool molecules::is_recepie_with(const molecules mol2)
  {
+	
+
+	 std::string firstName = this->name,
+				 secondName = mol2.name;
+
+	 parseMol(firstName);
+	 parseMol(secondName);
+
+	 if (firstName == secondName)return true;
+	 else
+	 {
+
 	 std::string sum_res((this->name) + (mol2.name));
 	 auto search = csv_to_RECIPIES::RECIPIES.find(sum_res);
 
 	 if (search != csv_to_RECIPIES::RECIPIES.end())
 		 return true;
 	 else return false;
+
+	 }
+	
+
  }
 
 
@@ -166,7 +290,7 @@ molecules::molecules() {};
 #endif
 			 std::string name;
 			 int32_t rad;
-			 int32_t r, g, b;
+			 int32_t r, g, b,lifetime;
 
 			 auto first_comma = s.find_first_of(",");
 			 name = s.substr(0, first_comma);
@@ -180,22 +304,20 @@ molecules::molecules() {};
 			 auto fourth_comma = s.find_first_of(",", third_comma+1);
 			 g = std::stoi(s.substr(third_comma + 1, fourth_comma - third_comma));
 
-			 b = std::stoi(s.substr(fourth_comma + 1, s.size() - fourth_comma));
+			 auto fifth_comma = s.find_first_of(",", fourth_comma + 1);
+			 b = std::stoi(s.substr(fourth_comma + 1, fifth_comma - fourth_comma));
+
+			 lifetime = std::stoi(s.substr(fifth_comma + 1, s.size() - fifth_comma));
 
 
 #ifdef TEST
-			 //std::cout << name << ' ' << rad << ' ' << r << ' ' << g << ' ' << b << ' ' << std::endl;
+			 std::cout << name << ' ' << rad << ' ' << r << ' ' << g << ' ' << b << ' ' << lifetime << ' ' << std::endl;
 #endif
 
 			 //insert Mols
 
-			 MOLS.insert({ name, {rad,r,g,b} });
-
+			 MOLS.insert({ name, {rad,r,g,b,lifetime} });
 		 }
-
-
-
-
 
 	 }
  }
@@ -206,10 +328,74 @@ molecules::molecules() {};
 	 for (auto& m : MOLS)
 	 {
 		 std::cout << m.first << "|";
-		 for (int i = 0; i < m.second.size(); i++)
+		 for (auto i = 0; i < m.second.size(); i++)
 			 std::cout << m.second[i] << "|";
 		 std::cout << std::endl;
 
 	 }
 	 std::cout << "|END OF MOLS|" << std::endl;
  }
+
+ 
+ void molecules::parseMol (std::string& name, int32_t& num) {
+	 num = 0;
+	 if (isdigit(name[0]))
+	 {
+		 num += std::stoi(name.substr(0, 1));
+		 name.erase(0, 1);
+
+		 if (isdigit(name[0]))
+		 {
+			 num = 10 * num + std::stoi(name.substr(0, 1));
+			 name.erase(0, 1);
+
+			 if (isdigit(name[0]))
+			 {
+				 num = 10 * num + std::stoi(name.substr(0, 1));
+				 name.erase(0, 1);
+
+				 if (isdigit(name[0]))
+				 {
+					 num = 10 * num + std::stoi(name.substr(0, 1));
+					 name.erase(0, 1);
+					 if (isdigit(name[0]))throw("TWO MUCH MOLECULES TRIIYNG TO JOIN");
+				 };
+
+			 };
+		 };
+	 }
+
+	 else
+	 {
+		 num = 1;
+	 }
+	 
+ };
+
+ //max mol size = 99999H20
+ void molecules::parseMol(std::string& name) {
+	 if (isdigit(name[0]))
+	 {
+		 name.erase(0, 1);
+
+		 if (isdigit(name[0]))
+		 {
+			 name.erase(0, 1);
+			 if (isdigit(name[0]))
+			 {
+				 name.erase(0, 1);
+				 if (isdigit(name[0]))
+				 {
+					 name.erase(0, 1);
+					 if (isdigit(name[0]))
+					 {
+						 name.erase(0, 1);
+						 if (isdigit(name[0]))throw("TWO MUCH MOLECULES TRIIYNG TO JOIN");
+					 };
+				 };
+			 };
+		 };
+	 }
+
+	
+ };

@@ -3,7 +3,8 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <initializer_list>
+#include "defined_globals.h"
+#include "random_generator.h"
 
 
 
@@ -12,8 +13,9 @@ class molecules {
 private:
 	
 	std::string name;
-	uint8_t radius=40;
-	uint8_t R, G, B;
+	int32_t radius=40;
+	int32_t R, G, B;
+	int32_t lifetime;
 	
 	//bool stable;
 
@@ -26,10 +28,13 @@ public:
 
 	std::string get_name() const { return this->name; }
 	int32_t get_radius() const { return this->radius; }
-	auto get_color() const { return std::vector<uint8_t>{this->R,this->G,this->B,1}; }
+	auto get_color() const { return std::vector<int32_t>{this->R,this->G,this->B,1}; }
+	auto get_lifetime()const { return this->lifetime; }
+	
 	std::vector<molecules>  operator+(const molecules& mol2);
+	std::vector<molecules>  decay();
 
-	bool is_recepie_with(const molecules& mol2);
+	bool is_recepie_with(const molecules mol2);
 
 	static std::map<std::string, std::vector<int32_t>> MOLS;
 
@@ -37,7 +42,9 @@ public:
 	void csv_to_MOLS(std::string FILE);
 	
 	void print_MOLS();
-	
+
+	void parseMol(std::string& name, int32_t& num);
+	void parseMol(std::string& name);
 };
 
 /*

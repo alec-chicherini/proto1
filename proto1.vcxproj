@@ -150,6 +150,7 @@
     <ClCompile Include="recipies.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="defined_globals.h" />
     <ClInclude Include="experiment_engine.h" />
     <ClInclude Include="experiment_enums.h" />
     <ClInclude Include="material.h" />

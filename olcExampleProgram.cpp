@@ -6,10 +6,8 @@
 #include "experiment_engine.h"
 #include <algorithm>
 #include <memory>
+#include "defined_globals.h"
 
-#define SCREEN_OFFSET 50 //aka. MAX_MOL_RADIUS
-
-//gradus return direction angle
 
 auto gradus = [](olc::vf2d& vec) {
 
@@ -26,8 +24,8 @@ class experiment_proto : public olc::PixelGameEngine
 private:
 	
 	
-	molecules A = { "2Al" };
-	molecules B = { "6H20" };
+	molecules A = { "Al" };
+	molecules B = { "H20" };
 	molecules C = { "Cl2" };
 	class molState;
 
@@ -60,10 +58,13 @@ public:
 		if (GetKey(olc::Key::K2).bPressed)	addMol(B);
 		if (GetKey(olc::Key::K3).bPressed)	addMol(C);
 
+
 		mouseControlling();
 		molStateUpdate(fElapsedTime);
 		molCollisionUpdate();
 		molIteractions();
+		molDecay(fElapsedTime);
+		molDecayIteractions();
 		molStaticCollisions();
 		molDynamicCollisions();
 		Clear(olc::WHITE);
@@ -98,7 +99,9 @@ public:
 
 		//update UI
 		void DrawPool() {
-		
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 			//main pool
 			DrawRect(pool_size_x, pool_size_y, pool_size_w, pool_size_h, olc::BLACK);
 
@@ -116,6 +119,9 @@ public:
 		}
 
 		void DrawMols() {
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 			for (auto& mol : molStates) {//draw molecule
 
 #ifdef SHOW_TEST_INFO
@@ -124,6 +130,7 @@ public:
 				
 #endif // SHOW_TEST_INFO
 				DrawCircle(mol.P, mol.radius, mol.molColor);
+				FillCircle(mol.P, mol.radius, mol.molColor);
 				DrawString(mol.P.x - 10, mol.P.y,
 
 #ifndef SHOW_TEST_INFO
@@ -134,7 +141,15 @@ public:
 					mol.molObj.get_name(),
 					//std::to_string(mol.Id),
 #endif // SHOW_TEST_INFO
-					mol.molColor, 1);
+					olc::WHITE, 1);
+
+#ifdef SHOW_TEST_INFO
+
+
+				DrawString(mol.P.x + mol.radius,mol.P.y - mol.radius, std::to_string(mol.lifetime), mol.molColor,1);
+#endif
+
+
 			}
 
 #ifdef SHOW_TEST_INFO
@@ -152,7 +167,9 @@ public:
 
 		void DrawStatistics() 
 		{
-		
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 			int step = 0;
 
 			auto drawPosX = pool_size_w + SCREEN_OFFSET + SCREEN_OFFSET + left_pool_width;
@@ -174,6 +191,10 @@ public:
 		}
 
 		void molStateUpdate(float fElapsedTime) {
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 
 			for (auto& mol : molStates) {
 
@@ -201,6 +222,9 @@ public:
 
 		void molCollisionUpdate()
 		{
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 			//return true if mols will overlap this frame
 			auto isMolOverlap = [](molState& mol1, molState& mol2) {
 				return ((mol1.radius + mol2.radius) * (mol1.radius + mol2.radius)) >=
@@ -238,7 +262,7 @@ public:
 									});
 
 								if(searchItVec == iteractionVector.end()){
-									iteractionVector.push_back(std::make_pair(mol1.Id, mol2.Id));
+									iteractionVector.push_back(std::move(std::make_pair(mol1.Id, mol2.Id)));
 #ifdef TEST
 								//std::cout << "iteration vector size= " << iteractionVector.size() << std::endl;
 #endif
@@ -265,25 +289,43 @@ public:
 
 		void molIteractions()
 		{
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 
+#ifdef  TESTT
+			if (iteractionVector.size()) {
+				std::cout << "Iteration_vector::size() = " << iteractionVector.size() << std::endl;
+				for (auto& i : iteractionVector)
+				{
+					std::cout << i.first << "|"<<i.second << "||";
+				}
+				std::cout << std::endl;
+			}
+#endif //  TEST
+			std::vector<int32_t> removeVector;
 			for (auto& i : iteractionVector)
 			{
+
 				const auto const mol1 = molIterById(i.first);
 				const auto const mol2 = molIterById(i.second);
 
+
 				std::vector<molecules> sum(mol1->molObj + mol2->molObj);
-#ifdef  TEST
+#ifdef  TESTT
 				std::cout << "molIteractions::sum.size() = " << sum.size() << std::endl;
 				for (auto& r : sum)
 				{
 					std::cout << r.get_name() << "|";
 
 				}
-				std::cout << std::endl;
+				
 #endif //  TEST
+
 				auto pos_middle = (mol1->P + mol2->P) / 2.0f;
 				auto dir_middle = (mol1->D + mol2->D) / 2.0f;
 				int molNum = 0;
+
 				for (molecules& s : sum)
 				{
 
@@ -302,15 +344,101 @@ public:
 					molNum++;
 				}
 
-				removeMol(i.first);
-				removeMol(i.second);
+				removeVector.push_back(i.first);
+				removeVector.push_back(i.second);
+
+
 			}
+
+			std::sort(removeVector.begin(), removeVector.end());
+			removeVector.erase(std::unique(removeVector.begin(), removeVector.end()), removeVector.end());
+
+			for(auto &r:removeVector)
+				removeMol(r);
+			
+
 			iteractionVector.clear();
+
 
 		}
 
 
+		void molDecay(float fElapsedTime){
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
+		
+		fLastSecond += fElapsedTime;
+		if (fLastSecond >= 1.0f) 
+		{
+			fLastSecond = 0;
+			iSecondFromStart++;
+#ifdef TEST
+			//std::cout << "iSecondFromStart = " << iSecondFromStart << std::endl;
+#endif
+			for (auto& m : molStates)
+				if (m.lifetime != -1)m.lifetime--;
+		}
+
+		}
+
+		void molDecayIteractions() {
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
+
+			std::vector<int32_t> removeVector;
+
+			for (auto& m : molStates)
+				if(m.lifetime==0)
+				{
+				
+					std::vector<molecules> sum(m.molObj.decay());
+					auto pos_middle = m.P;
+					auto dir_middle = m.D;
+					int molNum = 0;
+					
+					for (molecules& s : sum)
+					{
+
+						//radius of new group of molecules circle
+						float R = 0;
+						for (molecules& r : sum)R += 35;
+						R /= 3.14f;
+
+						float segSize = 2 * 3.14 / sum.size();
+						olc::vf2d rotVec = { R * cos(segSize * molNum),
+										   R * sin(segSize * molNum) };
+
+						auto pos = pos_middle + rotVec;
+
+						addMol(s, pos, dir_middle);
+						molNum++;
+					}
+
+
+					removeVector.push_back(m.Id);
+
+				}
+
+			std::sort(removeVector.begin(), removeVector.end());
+			removeVector.erase(std::unique(removeVector.begin(), removeVector.end()), removeVector.end());
+
+			for (auto& r : removeVector)
+				removeMol(r);
+
+		}
+
+
+
+
 		void molStaticCollisions() {
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 
 			for (auto& c : collisionVector) {
 
@@ -340,6 +468,11 @@ public:
 		//dynamics collision
 		void molDynamicCollisions( )
 		{
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
+
 			for (auto& c : collisionVector) {
 #ifdef TEST
 
@@ -394,6 +527,9 @@ public:
 
 		void mouseControlling() {
 
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
 
 			auto isPointOverlap = [](const int32_t& x, const int32_t& y, molState& mol) {
 				return x < (mol.P.x + mol.radius)&&
@@ -446,6 +582,11 @@ public:
 		};
 
 		void poolInit() {
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
+
 			button_panel_side = 100;
 
 			left_pool_width = SCREEN_OFFSET * 4;
@@ -490,7 +631,8 @@ public:
 			acceleration,//Acceleration x,y
 			mol.get_radius(),//radius
 			getId(),// ID
-			mass//mass
+			mass,//mass
+			mol.get_lifetime()//lifetime
 			};
 			
 			/*
@@ -521,8 +663,6 @@ public:
 			molStatistics.insert_or_assign(mol.get_name(), val());
 				
 				
-		
-		
 		};
 
 		//add at  possition with direction
@@ -533,7 +673,7 @@ public:
 				position,//possition x y
 				direction,//direction aka velocity vector
 				{ 0,0 },//acceleration 
-				olc::BLACK,
+				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
 				1.f);
 
 		};
@@ -559,20 +699,23 @@ public:
 				{ 0,0 },//direction aka velocity vector
 				{ 0,0 },//acceleration 
 
-				olc::BLACK,
+				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
 				1.f);
 				  
 		};
 
 
-		inline const std::vector<experiment_proto::molState>::iterator molIterById(int32_t &id)
+		inline const std::vector<molState>::iterator molIterById(int32_t &id)
 		{
 			auto search = std::find_if(
 				molStates.begin(),
 				molStates.end(),
 				[&id](molState& mol) {return mol.Id == id; });
 
-			return search;
+			if (search != molStates.end())
+				return search;
+			else throw(std::exception("ID NOT FOUND"));
+
 		}
 
 /*
@@ -599,11 +742,13 @@ public:
 					auto search2 = molStatistics.find(search->molObj.get_name());
 					return search2->second - 1;
 					};
-
-				molStatistics.insert_or_assign(search->molObj.get_name(), val());
+				if (auto num = val(); num != 0)
+					molStatistics.insert_or_assign(search->molObj.get_name(), num);
+				else molStatistics.erase(search->molObj.get_name());
 					
 
-				molStates.end() = molStates.erase(search);
+				//molStates.end() = 
+					molStates.erase(search);
 			};
 
 		}
@@ -651,7 +796,7 @@ public:
 						DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("colvec.size: " + std::to_string(collisionVector.size()))
 				, olc::BLACK, 1);
-			*/
+			
 
 			for (auto& m : molStates)
 			{
@@ -665,9 +810,7 @@ public:
 
 
 
-			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
-				std::string("molStates.size: " + std::to_string(molStates.size()))
-				, olc::BLACK, 1);
+			
 
 
 
@@ -680,10 +823,24 @@ public:
 						, olc::BLACK, 1);
 			}
 
+			*/
 
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("molStates.size: " + std::to_string(molStates.size()))
+				, olc::BLACK, 1);
+
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("last added mol ID: " + std::to_string(molStates.back().Id))
+				, olc::BLACK, 1);
 
 			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("iteractionVector.size: " + std::to_string(iteractionVector.size()))
+
+
+				, olc::BLACK, 1);
+
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("SECONDS FROM START: " + std::to_string(iSecondFromStart))
 
 
 				, olc::BLACK, 1);
@@ -713,6 +870,7 @@ private:
 			int32_t radius;
 			int32_t Id;
 			float mass;
+			int32_t lifetime;
 			//0 - empty cell
 			//1 - horisontal walls
 			//2 - vertical walls
@@ -726,8 +884,6 @@ private:
 
 		}
 
-
-	
 		 std::vector<std::pair<molState*,molState*>> collisionVector;
 		 std::vector<std::pair<int32_t, int32_t>> iteractionVector;
 		 std::vector<molState> molStates;
@@ -745,6 +901,9 @@ private:
 
 
 		molState* pSelectedMol=nullptr;
+
+		int32_t iSecondFromStart=0;
+		float fLastSecond=0;
 
 
 //////////////////////////////////////////////////////
