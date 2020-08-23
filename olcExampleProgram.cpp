@@ -308,7 +308,9 @@ public:
 				std::cout << std::endl;
 			}
 #endif //  TEST
+#ifdef TEST
 			bool b = false;
+#endif //  TEST
 			std::vector<int32_t> removeVector;
 			for (auto& i : iteractionVector)
 			{
@@ -336,22 +338,48 @@ public:
 				auto dir_middle = (mol1->D + mol2->D) / 2.0f;
 				int molNum = 0;
 
+				auto max_r = std::max_element(sum.begin(), sum.end(), [](const molecules& a, const  molecules& b) {return a.get_radius() < b.get_radius(); });
+				float R = max_r->get_radius() * sum.size() / 3.14f;
+				if (R < max_r->get_radius())R = max_r->get_radius() * 1.3f;
+
+
+				olc::vf2d prev_rotVec;
+				int32_t prev_radius;
+
 				for (molecules& s : sum)
 				{
+#ifdef TESTT
+					std::cout << m.Id << "||" << std::endl;
+#endif
+					float segSize = 2 * 3.14 / sum.size();
+					olc::vf2d rotVec = { R * cos(segSize * molNum),
+									   R * -1.f * sin(segSize * molNum) };
 
-					//radius of new group of molecules circle
-					float R=0;
-					for (molecules& r : sum)R += 35;
-					R /= 3.14f;
+					if (molNum != 0)
+					{
+						auto distance = std::hypot(rotVec.x - prev_rotVec.x, rotVec.y - prev_rotVec.y);
+						if (distance < (s.get_radius() + prev_radius))
+						{
+							rotVec.x *= (s.get_radius() + prev_radius) / distance;
+							rotVec.y *= (s.get_radius() + prev_radius) / distance;
 
-					float segSize = 2*3.14/sum.size();
-					olc::vf2d rotVec={ R * cos(segSize * molNum),
-									   R *sin(segSize * molNum)};
+							prev_rotVec = rotVec;
+							prev_radius = s.get_radius();
+						}
 
-					auto pos = pos_middle + rotVec;
+					}
+					else {
+						prev_rotVec = rotVec;
+						prev_radius = s.get_radius();
+					}
+
+					auto pos = pos_middle + rotVec * 1.1f;
 
 					addMol(s, pos, dir_middle);
 					molNum++;
+#ifdef TEST
+					std::cout << "| " << pos << "  = " << pos_middle << " + " << rotVec << "radius= " << s.get_radius() << std::endl;
+#endif
 				}
 
 				removeVector.push_back(i.first);
