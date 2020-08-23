@@ -2,8 +2,8 @@
 
 //#define IN_CONSOLE
 
+//#define TEST_HARD_DEBUG
 #define TEST
-
 
 //adds ne screen under main to check collisions
 #define SHOW_TEST_INFO

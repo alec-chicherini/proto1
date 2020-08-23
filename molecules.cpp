@@ -43,7 +43,7 @@ molecules::molecules(std::string _name)
 			G = (search->second[2]+ searchX->second[2])/2;
 			B = (search->second[3]+ search->second[3])/2;
 			lifetime = (searchX->second[4])/num;
-			std::cout<<std::endl; 
+			if (lifetime < 3)lifetime = 3;
 		}
 		else {
 			radius = 20;
@@ -81,8 +81,8 @@ molecules::molecules() {
 	 
 
 	 std::string sum_res((this->name) + (mol2.name));
-#ifdef TEST
-	// std::cout << " operator+ -> (this->name)+(mol2.name) = " << "|" << sum_res << "|" << std::endl;
+#ifdef TESTT
+	 std::cout << " operator+ -> (this->name)+(mol2.name) = " << "|" << sum_res << "|" << std::endl;
 #endif
 
 	auto search = csv_to_RECIPIES::RECIPIES.find(sum_res);
@@ -151,7 +151,7 @@ molecules::molecules() {
 		}
 
 
-#ifdef  TEST
+#ifdef  TESTT
 		std::cout << "operator+::res.size() = " << res.size()<<std::endl;
 		for (auto& r : res)
 		{
@@ -175,11 +175,11 @@ molecules::molecules() {
 		parseMol(secondName, secondNum);
 
 
-#ifdef TEST
-		//std::cout << "PARSE MOL RESULT::" << "this->name=|" << this->name <<"|"<< std::endl;
-		//std::cout << "PARSE MOL RESULT::" << "firstName=|" << firstName << "|firstNum=|" << firstNum <<"|" << std::endl;
-		//std::cout << "PARSE MOL RESULT::" << "mol2.name=|" << mol2.name <<"|" << std::endl;
-		//std::cout << "PARSE MOL RESULT::" << "secondName=|" << secondName << "|secondNum=|" << secondNum <<"|" << std::endl;
+#ifdef TESTT
+		std::cout << "PARSE MOL RESULT::" << "this->name=|" << this->name <<"|"<< std::endl;
+		std::cout << "PARSE MOL RESULT::" << "firstName=|" << firstName << "|firstNum=|" << firstNum <<"|" << std::endl;
+		std::cout << "PARSE MOL RESULT::" << "mol2.name=|" << mol2.name <<"|" << std::endl;
+		std::cout << "PARSE MOL RESULT::" << "secondName=|" << secondName << "|secondNum=|" << secondNum <<"|" << std::endl;
 #endif
 
 		if(firstName==secondName)
@@ -189,6 +189,7 @@ molecules::molecules() {
 		//res.push_back(molecules(std::string("NULL")));
 #ifdef  TEST
 		std::cout << "operator+::res NULL Vector returned:  " << res.size() << std::endl;
+		throw("operator+::res NULL Vector returned: ");
 
 #endif //  TEST
 		}

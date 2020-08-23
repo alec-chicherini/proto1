@@ -32,7 +32,7 @@ public:
 	auto get_lifetime()const { return this->lifetime; }
 	
 	std::vector<molecules>  operator+(const molecules& mol2);
-	std::vector<molecules>  decay();
+	std::vector<molecules>  decay() ;
 
 	bool is_recepie_with(const molecules mol2);
 

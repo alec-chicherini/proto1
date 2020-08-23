@@ -7,6 +7,8 @@
 #include <algorithm>
 #include <memory>
 #include "defined_globals.h"
+#include <mutex>
+#include <algorithm>
 
 
 auto gradus = [](olc::vf2d& vec) {
@@ -44,9 +46,9 @@ public:
 		poolInit();
 		Clear(olc::WHITE);
 
-		addMol(A);
+		//addMol(A);
 		addMol(B);
-		addMol(C);
+		//addMol(C);
 
 		return true;
 	}
@@ -257,8 +259,11 @@ public:
 									iteractionVector.begin(),
 									iteractionVector.end(),
 									[&mol1, &mol2](std::pair<int32_t, int32_t>& currentIteration)
-									{
-										return (currentIteration.first==mol2.Id)&& (currentIteration.second == mol1.Id);
+									{//if one of new collisions already at iteraction vector do not add this pair. olny one pair per tick.
+									 return (currentIteration.first  == mol1.Id) || 
+											(currentIteration.second == mol1.Id) ||
+											(currentIteration.first  == mol2.Id) || 
+											(currentIteration.second == mol2.Id);
 									});
 
 								if(searchItVec == iteractionVector.end()){
@@ -285,7 +290,7 @@ public:
 		};
 
 
-//chemical iterations. creating new  moleculas or destroy old  
+//chemical iterations. creating new  moleculas and destroy old  
 
 		void molIteractions()
 		{
@@ -303,23 +308,28 @@ public:
 				std::cout << std::endl;
 			}
 #endif //  TEST
+			bool b = false;
 			std::vector<int32_t> removeVector;
 			for (auto& i : iteractionVector)
 			{
 
 				const auto const mol1 = molIterById(i.first);
 				const auto const mol2 = molIterById(i.second);
-
-
+#ifdef  TEST
+				std::cout << mol1->molObj.get_name()<<" + "<<mol2->molObj.get_name();
+#endif
 				std::vector<molecules> sum(mol1->molObj + mol2->molObj);
-#ifdef  TESTT
-				std::cout << "molIteractions::sum.size() = " << sum.size() << std::endl;
+#ifdef  TEST
+				//std::cout << "molIteractions::sum.size() = " << sum.size() << std::endl;
+		         std::cout << " |=> ";
 				for (auto& r : sum)
 				{
 					std::cout << r.get_name() << "|";
 
 				}
+				b = true;
 				
+
 #endif //  TEST
 
 				auto pos_middle = (mol1->P + mol2->P) / 2.0f;
@@ -358,8 +368,15 @@ public:
 			
 
 			iteractionVector.clear();
-
-
+#ifdef TEST
+			if (b) {
+				std::cout << " molStates:| ";
+				for (auto& s : molStates)
+					std::cout << s.molObj.get_name() << "|";
+				std::cout << std::endl;
+				b = false;
+			}
+#endif
 		}
 
 
@@ -372,13 +389,13 @@ public:
 		fLastSecond += fElapsedTime;
 		if (fLastSecond >= 1.0f) 
 		{
-			fLastSecond = 0;
+			fLastSecond = 0.f;
 			iSecondFromStart++;
-#ifdef TEST
-			//std::cout << "iSecondFromStart = " << iSecondFromStart << std::endl;
+#ifdef TESTT
+			std::cout << "iSecondFromStart = " << iSecondFromStart << std::endl;
 #endif
 			for (auto& m : molStates)
-				if (m.lifetime != -1)m.lifetime--;
+				if ((m.lifetime != -1)&&(m.lifetime!=0))m.lifetime--;
 		}
 
 		}
@@ -391,44 +408,110 @@ public:
 
 			std::vector<int32_t> removeVector;
 
-			for (auto& m : molStates)
+
+			for (auto& const m : molStates)
 				if(m.lifetime==0)
 				{
+					const auto iID = m.Id;
+#ifdef TESTT
+					std::cout << m.Id << "|" << std::endl;
+#endif
 				
-					std::vector<molecules> sum(m.molObj.decay());
+					const std::vector<molecules> sum(m.molObj.decay());
 					auto pos_middle = m.P;
 					auto dir_middle = m.D;
 					int molNum = 0;
 					
-					for (molecules& s : sum)
+					//radius of new group of molecules circle
+
+
+					auto max_r= std::max_element(sum.begin(), sum.end(), []( const molecules& a, const  molecules& b) {return a.get_radius() < b.get_radius(); });
+					float R =  max_r->get_radius()* sum.size() / 3.14f;
+					if (R < max_r->get_radius())R = max_r->get_radius() * 1.3f;
+
+					
+					olc::vf2d prev_rotVec;
+					int32_t prev_radius;
+					
+
+					for (molecules s : sum)
 					{
-
-						//radius of new group of molecules circle
-						float R = 0;
-						for (molecules& r : sum)R += 35;
-						R /= 3.14f;
-
+#ifdef TESTT
+						std::cout << m.Id << "||" << std::endl;
+#endif
 						float segSize = 2 * 3.14 / sum.size();
 						olc::vf2d rotVec = { R * cos(segSize * molNum),
-										   R * sin(segSize * molNum) };
+										   R * -1.f*sin(segSize * molNum) };
 
-						auto pos = pos_middle + rotVec;
+						if (molNum != 0)
+						{
+							auto distance = std::hypot(rotVec.x - prev_rotVec.x, rotVec.y - prev_rotVec.y);
+							if (distance < (s.get_radius() + prev_radius))
+							{
+								rotVec.x *= (s.get_radius() + prev_radius) / distance;
+								rotVec.y *= (s.get_radius() + prev_radius) / distance;
+
+								prev_rotVec = rotVec;
+								prev_radius = s.get_radius();
+							}
+
+						}
+						else {
+							prev_rotVec = rotVec;
+							prev_radius = s.get_radius();
+						}
+						
+						auto pos = pos_middle + rotVec*1.1f;
 
 						addMol(s, pos, dir_middle);
 						molNum++;
+#ifdef TEST
+						std::cout << "| " << pos << "  = " << pos_middle << " + " << rotVec<<"radius= " << s.get_radius()<<std::endl;
+#endif
 					}
+#ifdef TESTT
+					std::cout << m.Id << "||||" << std::endl;
+#endif
 
-
-					removeVector.push_back(m.Id);
+					removeVector.push_back(iID);
+#ifdef TESTT
+					std::cout << m.Id<<"|||||" << std::endl;
+#endif
 
 				}
 
+#ifdef TESTT
+			
+			std::cout << __FUNCTION__ << " removeVector before unique: ";
+			for (auto& r : removeVector)
+				std::cout << r << "|";
+			std::cout << std::endl; 
+
+#endif
+
 			std::sort(removeVector.begin(), removeVector.end());
 			removeVector.erase(std::unique(removeVector.begin(), removeVector.end()), removeVector.end());
+#ifdef TESTT
+
+			std::cout << __FUNCTION__ << " removeVector: ";
+			for (auto& r : removeVector)
+				std::cout << r << "|";
+			std::cout << std::endl ;
+
+			std::cout << __FUNCTION__ << " molStates before remove: ";
+			for (auto& s : molStates)
+				std::cout << s.Id << "-"<<s.molObj.get_name() << "|";
+			std::cout << std::endl;
+#endif
 
 			for (auto& r : removeVector)
 				removeMol(r);
-
+#ifdef TESTT
+			std::cout << __FUNCTION__ << " molStates: ";
+			for (auto& s : molStates)
+				std::cout << s.Id << "-" << s.molObj.get_name() << "|";
+			std::cout << std::endl;
+#endif
 		}
 
 
@@ -444,7 +527,7 @@ public:
 
 				float fDistance = hypotf(c.first->P.x - c.second->P.x, c.first->P.y - c.second->P.y);
 				float fOverlap = 0.5f * (fDistance - c.first->radius - c.second->radius);
-#ifdef TEST
+#ifdef TESTT
 				std::cout << "collisionVector.size = " << collisionVector.size()
 					<< " c.first->Id =  " << c.first->Id << " c.second->Id = " << c.second->Id;
 				std::cout << " fDistance = " << fDistance << " fOverlap = " << fOverlap << std::endl;
@@ -474,7 +557,7 @@ public:
 #endif TEST_HARD_DEBUG
 
 			for (auto& c : collisionVector) {
-#ifdef TEST
+#ifdef TESTT
 
 
 				std::cout << "Dynamic:c.first->D = " << c.first->D << "c.second->D = " << c.second->D << std::endl;
@@ -515,7 +598,7 @@ public:
 				}
 
 
-#ifdef TEST
+#ifdef TESTT
 
 
 				std::cout << "!Dynamic:c.first->D = " << c.first->D << "c.second->D = " << c.second->D << std::endl;
@@ -609,7 +692,7 @@ public:
 		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction,
 			        olc::vf2d acceleration, olc::Pixel color, float mass)
 		{
-
+			std::lock_guard<std::mutex> lg(addMol_mtx);
 			olc::vf2d CurrentPos;
 			int32_t randX = RAND_X%pool_size_w;
 			int32_t randY = RAND_Y%pool_size_h;
@@ -705,7 +788,7 @@ public:
 		};
 
 
-		inline const std::vector<molState>::iterator molIterById(int32_t &id)
+		 const std::vector<molState>::iterator molIterById(int32_t &id)
 		{
 			auto search = std::find_if(
 				molStates.begin(),
@@ -714,7 +797,7 @@ public:
 
 			if (search != molStates.end())
 				return search;
-			else throw(std::exception("ID NOT FOUND"));
+			else throw("ID NOT FOUND");
 
 		}
 
@@ -853,6 +936,9 @@ public:
 #endif
 
 		const int32_t getId() {
+			
+
+			std::lock_guard<std::mutex> lg(get_Id_mtx);
 			static int32_t name = 100;
 
 			return name++;
@@ -860,6 +946,9 @@ public:
 
 	
 private:
+		std::mutex get_Id_mtx,
+				   addMol_mtx;
+
 		class molState {
 		public:
 			molecules molObj;
