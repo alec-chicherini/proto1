@@ -1,3 +1,8 @@
+/*
+Chemical experiment prototype engine
+GitHub:		https://github.com/ikvasir/proto1
+License: MIT
+*/
 #pragma once
 #include "molecules.h"
 #include <string>

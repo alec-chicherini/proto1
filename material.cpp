@@ -1,3 +1,8 @@
+/*
+Chemical experiment prototype engine
+GitHub:		https://github.com/ikvasir/proto1
+License: MIT
+*/
 #include "material.h"
 #include "random_generator.h"
 #include "test.h"

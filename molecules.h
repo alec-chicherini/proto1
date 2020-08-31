@@ -1,3 +1,8 @@
+/*
+Chemical experiment prototype engine
+GitHub:		https://github.com/ikvasir/proto1
+License: MIT
+*/
 #pragma once
 #include <string>
 #include <vector>
@@ -5,6 +10,9 @@
 #include <map>
 #include "defined_globals.h"
 #include "random_generator.h"
+#include "test.h"
+#include "recipies.h"
+#include "utilites.h"
 
 
 
@@ -13,14 +21,14 @@ class molecules {
 private:
 	
 	std::string name;
-	int32_t radius=40;
+	int32_t radius;
 	int32_t R, G, B;
 	int32_t lifetime;
 	
 	//bool stable;
 
 public:
-
+	friend class csv_to_RECIPIES;
 	molecules(std::string _name);
 	molecules(const molecules& mol);
 	molecules();
@@ -34,7 +42,8 @@ public:
 	std::vector<molecules>  operator+(const molecules& mol2);
 	std::vector<molecules>  decay() ;
 
-	bool is_recepie_with(const molecules mol2);
+	std::vector<std::string> is_recepie_with(const molecules mol2);
+	bool is_iterract(const molecules mol2);
 
 	static std::map<std::string, std::vector<int32_t>> MOLS;
 
@@ -42,9 +51,11 @@ public:
 	void csv_to_MOLS(std::string FILE);
 	
 	void print_MOLS();
+	//moved to utilty.h
+	//void parseMol(std::string& name, int32_t& num);
+	// parseMol(std::string& name);
 
-	void parseMol(std::string& name, int32_t& num);
-	void parseMol(std::string& name);
+
 };
 
 /*

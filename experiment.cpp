@@ -1,4 +1,22 @@
+/*
+Chemical experiment engine  prototype v 0.6
 
+Game graphics made at Pixel GAME ENGINE v2.08 License (OLC-3) Copyright 2018 - 2020 OneLoneCoder.com
+
+Some of game mechanics from: https://www.youtube.com/javidx9
+
+
+
+Compiling at:Microsoft Visual Studio Community 2019Version 16.7.2 - std:c++17
+
+Tested at Microsoft Windows HOME 10 Version	10.0.19041 Build 19041
+
+Screen resolution not lower than: 1280x720
+
+GitHub:		https://github.com/ikvasir/proto1
+mail:       chicherin.alexey@gmail.com
+
+*/
 
 #define OLC_PGE_APPLICATION
 #include <iostream>
@@ -13,7 +31,7 @@
 
 auto gradus = [](olc::vf2d& vec) {
 
-	auto gradus = acos(vec.x / hypot(vec.y, vec.x)) * 180 / 3.14;
+	auto gradus = acos(vec.x / hypot(vec.y, vec.x)) * float(180) / 3.14f;
 
 	if (vec.y > 0)gradus += 180;
 
@@ -25,17 +43,19 @@ class experiment_proto : public olc::PixelGameEngine
 {
 private:
 	
-	
-	molecules A = { "Al" };
-	molecules B = { "H20" };
+#ifdef TEST
+	molecules A = { "HCl" };
+	molecules B = { "Al(OH)3" };
 	molecules C = { "Cl2" };
+#endif
+
 	class molState;
 
 public:
 	
 	experiment_proto()
 	{
-		sAppName = "Chemical experiment prototype visualisation";
+		sAppName = "Chemical experiment prototype engine v 0.6";
 	}
 
 public:
@@ -46,9 +66,29 @@ public:
 		poolInit();
 		Clear(olc::WHITE);
 
+#ifdef TEST
 		//addMol(A);
-		addMol(B);
+		//addMol(B,molStates);
 		//addMol(C);
+#endif
+		current_game_lvl = "lvls\\demo.csv";
+		load_lvl(current_game_lvl);
+
+#ifdef TEST
+
+		std::cout << "availible mols:";
+		for (auto& m : molLeftPool) std::cout << m.molObj.get_name() << "|";
+		std::cout << std::endl;
+
+		std::cout << "added recepies: ";
+		std::cout << std::endl;
+		csv_to_RECIPIES chek_rep; 
+		chek_rep.print_RECIPIES();
+		std::cout << std::endl;
+		for(auto& r:molResult)
+			std::cout << "awaiting result: "<<r.molObj.get_name()<<" ";
+
+#endif
 
 		return true;
 	}
@@ -56,12 +96,16 @@ public:
 	bool OnUserUpdate(float fElapsedTime)
 	{
 
-		if (GetKey(olc::Key::K1).bPressed)	addMol(A);
-		if (GetKey(olc::Key::K2).bPressed)	addMol(B);
-		if (GetKey(olc::Key::K3).bPressed)	addMol(C);
+#ifdef TEST
+
+		if (GetKey(olc::Key::K1).bPressed)	addMol(A, molStates);
+		if (GetKey(olc::Key::K2).bPressed)	addMol(B, molStates);
+		if (GetKey(olc::Key::K3).bPressed)	addMol(C, molStates);
+#endif
 
 
-		mouseControlling();
+		if(!GAME_PAUSE){
+		
 		molStateUpdate(fElapsedTime);
 		molCollisionUpdate();
 		molIteractions();
@@ -69,11 +113,17 @@ public:
 		molDecayIteractions();
 		molStaticCollisions();
 		molDynamicCollisions();
+		}
 		Clear(olc::WHITE);
+		mouseControlling();
 		DrawPool();
 		DrawMols();
+		DrawLeftPool();
 		DrawStatistics();
-
+		DrawRecepies();
+		DrawLog();
+		if (HELP_FLAG)DrawHelp();
+		gameLogic();
 
 #ifdef SHOW_TEST_INFO
 
@@ -99,6 +149,143 @@ public:
 
 	public:
 
+		void gameLogic() {
+		
+
+			for (auto& r : molResult)
+			{
+				std::string name=r.molObj.get_name();
+				int32_t num;
+
+				parseMol(name, num);
+
+				auto search = molStatistics.find(name);
+
+				if (search != molStatistics.end())
+					if (molStatistics.at(name) >= num)
+						drawMsg(SCREEN_OFFSET + pool_size_w / 4,
+							SCREEN_OFFSET + pool_size_h / 2,
+							" YOU DID IT :D\n"
+							"\n"
+							"    IT TAKES "  + std::to_string(iSecondFromStart) + " SEC.",
+							4);
+
+			}
+
+		};
+
+		void drawMsg(int32_t x, int32_t y, std::string msg, int32_t scale)
+		{
+			GAME_PAUSE = true;
+			DrawString( x,y,msg, olc::BLACK, scale);
+
+		}
+
+		void restart_lvl()
+		{
+			
+			collisionVector.clear();
+			iteractionVector.clear();
+			molStates.clear();
+			molStatistics.clear();
+		    molLeftPool.clear();
+			molResult.clear();
+			csv_to_RECIPIES::RECIPIES.clear();
+			IterLog::iteractionsLog.clear();
+
+            pSelectedMol = nullptr;
+			iSecondFromStart = 0;
+			fLastSecond = 0;
+			HELP_FLAG = true;
+			
+
+		}
+
+		void load_lvl(std::string lvlName) {
+
+			
+			////////////////////////////////////
+			std::ifstream file;
+			file.open(lvlName);
+			if (!file)
+#ifdef TEST
+				std::cout << "File with this LVL name not oppened :" << lvlName << std::endl;
+#endif
+
+#ifndef TEST
+			throw(std::exception("FILE WITH THIS LVL NAME NOT OPPENED"));
+#endif // !TEST
+			else {
+				std::string s;
+				for (file >> s; !file.eof(); file >> s) {
+#ifdef TESTT
+					std::cout << s << std::endl;
+#endif
+					s.erase(remove_if(s.begin(), s.end(), isspace), s.end());
+
+					if (s[0] == '/' && s[1] == '/')continue;
+
+					else if (s.find("mols") != s.npos)
+					{
+						int32_t pos_y = SCREEN_OFFSET+15;
+						std::string currentMol = "";
+						for (auto ch = 5; ch < s.size(); ch++)
+						{
+							if (s[ch] != ',') currentMol += s[ch];
+
+							if(s[ch] == ','||ch+1==s.size())
+							{
+								molecules mol(currentMol);
+								pos_y += mol.get_radius();
+								addMol(mol, { float(SCREEN_OFFSET + left_pool_width / 2),float(pos_y) }, molLeftPool,false);
+								pos_y += mol.get_radius();
+								currentMol = "";
+							};
+						}
+					}
+					else if (s.find("result=") != s.npos) {
+						molecules res_mol(s.substr(7));
+						addMol(res_mol, { float(SCREEN_OFFSET + left_pool_width / 2),float(SCREEN_OFFSET+left_pool_height- res_mol.get_radius()-5) }, molResult,false);
+					}
+
+					else{
+
+						std::string s1, s2, s3;
+
+						s1 = s.substr(0, s.find_first_of(","));
+						s2 = s.substr(s.find_first_of(",") + 1, s.find_last_of(",") - s.find_first_of(",") - 1);
+						s3 = s.substr(s.find_last_of(",") + 1, s.size() - s.find_last_of(","));
+
+#ifdef TEST
+						// std::cout << s1 << ' ' << s2 << ' ' << s3 << ' ' << std::endl;
+#endif
+
+
+						int32_t num1, num2;
+
+						parseMol(s1, num1);
+						parseMol(s2, num2);
+
+
+						//insert recepie
+						auto tup = std::make_tuple(num1, s1, num2, s2, s3);
+						csv_to_RECIPIES::RECIPIES.push_back(tup);
+					}
+				}
+			};
+			////////////////////////////////
+
+
+
+
+
+
+
+			
+		};
+
+
+
 		//update UI
 		void DrawPool() {
 #ifdef TEST_HARD_DEBUG
@@ -113,9 +300,120 @@ public:
 			//right pool
 			DrawRect(TARGET_SCREEN_SIZE_X- SCREEN_OFFSET- right_pool_width, SCREEN_OFFSET, right_pool_width, right_pool_height, olc::BLACK);
 
-			//Draw button1
-			DrawRect(SCREEN_OFFSET, pool_size_h + SCREEN_OFFSET, left_pool_width, button_panel_side, olc::BLACK);
-			DrawString(SCREEN_OFFSET + left_pool_width/2, pool_size_h + SCREEN_OFFSET + button_panel_side/2, "BUTTON1", olc::BLACK);
+			//Draw Recepie window
+			DrawRect(SCREEN_OFFSET , pool_size_h + SCREEN_OFFSET, TARGET_SCREEN_SIZE_X- log_pool_width- SCREEN_OFFSET- SCREEN_OFFSET, log_pool_height, olc::BLACK);
+
+			//Draw Log window
+			DrawRect(TARGET_SCREEN_SIZE_X - log_pool_width - SCREEN_OFFSET, pool_size_h + SCREEN_OFFSET, log_pool_width, log_pool_height, olc::BLACK);
+
+			//TEXT LIKE BUTTONS
+			DrawString(TARGET_SCREEN_SIZE_X - SCREEN_OFFSET - 40, SCREEN_OFFSET-10, "HELP", olc::BLACK);
+
+			DrawString(TARGET_SCREEN_SIZE_X - SCREEN_OFFSET - 140, SCREEN_OFFSET - 10, "RESTART", olc::BLACK);
+
+			DrawString(SCREEN_OFFSET + 5, SCREEN_OFFSET - 10, std::string("SECONDS FROM START: " + std::to_string(iSecondFromStart)), olc::BLACK, 1);
+
+		}
+
+		void DrawLeftPool()
+		{
+
+			DrawString({ SCREEN_OFFSET + 5, SCREEN_OFFSET + 5 }, "MOLECULES:", olc::BLACK, 1);
+			for (auto& mol : molLeftPool)
+			{
+
+				DrawCircle(mol.P, mol.radius, mol.molColor);
+				FillCircle(mol.P, mol.radius, mol.molColor);
+				DrawString(mol.P.x - mol.radius + 5, mol.P.y, mol.molObj.get_name(),olc::WHITE, 1);
+
+			}
+
+
+			for (auto& mol : molResult) 
+			{
+				DrawCircle(mol.P, mol.radius, mol.molColor);
+				FillCircle(mol.P, mol.radius, mol.molColor);
+				DrawString(mol.P.x - mol.radius + 5, mol.P.y, mol.molObj.get_name(), olc::WHITE, 1);
+			
+			}
+
+			DrawString({ SCREEN_OFFSET + 5, pool_size_h - 25 }, "GOAL:", olc::BLACK, 1);
+
+		};
+
+		void DrawHelp()
+		{
+			GAME_PAUSE = true;
+			DrawString(pool_size_x+5, pool_size_y+5,
+				"   \n"
+				"   \n"
+				"   \n"
+				
+				"   \n"
+				"         CLICK ON THE MOLECULE ON THE LEFT                                                                    ^                       \n"
+				"<--                                                                                                      HELP  |                                            \n"
+				"         TO ADD IT IN THE                                                                                                                             \n"
+				"                                                                                                            AND                                   \n"
+				"         EXPERIMENT POOL                                                                                                                              \n"
+				"                                                                                                          RESTART    \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+
+				"   \n"
+				"   \n"
+				"   \n"
+
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"                                 HI! THIS IS DEMO LEVEL FOR CHEMICAL EXPERIMENT ENGINE - GAME MECHANIC  \n"
+				"   \n"
+				"                                             \n"
+				"   \n"
+				"                                          \n"
+
+				"              CLICK AND PULL                             IF A RECIPE EXISTS                    MOLECULES OF THE SAME TYPE                       \n"
+				"   \n"
+				"              ON MOLECULES IN THE POOL                   MOLECULES  ITERACT                    COMBINE INTO TEMPORARY                        \n"
+				"   \n"
+				"              TO MAKE THEM MOVE                          WITH EACH OTHER                       AND DECAY WITH TIME                      \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"			
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"   \n"
+				"                                                                                                STATISTICS   -->             \n"
+				"                                                                                                                 \n"
+				"                                                                                                  AND                        \n"
+				"                                                                                                                 \n"
+				"                                                                                                  LOG                    \n"
+				"                                                                                                                 \n"
+				"                                                                                                   |           \n"
+				"                                                                                                   v         \n"
+				"                                                                                                        \n"
+				"                                                                                                        \n"
+				"           CREATE                                                                                                    \n"
+				"                                                                                                        \n"
+				"<--        THIS CHEMICAL\n"
+				"                                                                                                        \n"
+				"           TO WIN THE GAME \n"
+				, olc::BLACK, 1);
+
 
 
 		}
@@ -133,7 +431,7 @@ public:
 #endif // SHOW_TEST_INFO
 				DrawCircle(mol.P, mol.radius, mol.molColor);
 				FillCircle(mol.P, mol.radius, mol.molColor);
-				DrawString(mol.P.x - 10, mol.P.y,
+				DrawString(mol.P.x - mol.radius+5, mol.P.y,
 
 #ifndef SHOW_TEST_INFO
 					mol.molObj.get_name(),
@@ -145,11 +443,9 @@ public:
 #endif // SHOW_TEST_INFO
 					olc::WHITE, 1);
 
-#ifdef SHOW_TEST_INFO
 
-
-				DrawString(mol.P.x + mol.radius,mol.P.y - mol.radius, std::to_string(mol.lifetime), mol.molColor,1);
-#endif
+				std::string sLifetime = (mol.lifetime == -1)?"inf":std::to_string(mol.lifetime);
+				DrawString(mol.P.x + mol.radius,mol.P.y - mol.radius, sLifetime, mol.molColor,1);
 
 
 			}
@@ -164,8 +460,35 @@ public:
 				DrawLine(pSelectedMol->P.x, pSelectedMol->P.y,GetMouseX(), GetMouseY(),olc::BLACK);
 			}
 		}
+		void DrawRecepies() 
+		{
+
+#ifdef TEST_HARD_DEBUG
+			std::cout << __FUNCTION__ << std::endl;
+#endif TEST_HARD_DEBUG
+			int step = 0;
+
+			auto drawPosX = SCREEN_OFFSET + 10;
+
+			DrawString(drawPosX, SCREEN_OFFSET + pool_size_h + 10 + (step++) * 10, std::string("RECIPES:"), olc::BLACK, 1);
+
+			
+			for (auto& s : csv_to_RECIPIES::RECIPIES)
+			{
+				std::string res="";
+				if (std::get<0>(s) != 1)res += std::to_string(std::get<0>(s));
+				res += std::get<1>(s);
+				res += "+";
+				if (std::get<2>(s) != 1)res += std::to_string(std::get<2>(s));
+				res += std::get<3>(s);
+				res += "=";
+				res += std::get<4>(s);
+
+				DrawString(drawPosX, SCREEN_OFFSET + pool_size_h + 10 + (step++) * 10,res, olc::BLACK, 1);
+			}
 
 
+		};
 
 		void DrawStatistics() 
 		{
@@ -174,14 +497,15 @@ public:
 #endif TEST_HARD_DEBUG
 			int step = 0;
 
-			auto drawPosX = pool_size_w + SCREEN_OFFSET + SCREEN_OFFSET + left_pool_width;
+			auto drawPosX = pool_size_w + SCREEN_OFFSET + 10 + left_pool_width;
 			
+			DrawString(drawPosX, SCREEN_OFFSET + 10 + (step++) * 10, std::string("STATISTICS:"), olc::BLACK, 1);
 
 				for(auto& m:molStatistics)
 				{
-					DrawString(drawPosX, SCREEN_OFFSET+SCREEN_OFFSET +(step++)*10,
+					DrawString(drawPosX, SCREEN_OFFSET+10 +(step++)*10,
 						std::string(m.first +
-							" - "+
+							"-"+
 							std::to_string(m.second)
 									)
 
@@ -252,7 +576,7 @@ public:
 						if (isMolOverlap(mol1, mol2))
 						{
 
-							if ((mol1.molObj.is_recepie_with(mol2.molObj)))
+							if ((mol1.molObj.is_iterract(mol2.molObj)))
 							{
 
 								auto searchItVec = std::find_if(
@@ -300,7 +624,7 @@ public:
 
 #ifdef  TESTT
 			if (iteractionVector.size()) {
-				std::cout << "Iteration_vector::size() = " << iteractionVector.size() << std::endl;
+				std::cout << "Iteraction_vector::size() = " << iteractionVector.size() << std::endl;
 				for (auto& i : iteractionVector)
 				{
 					std::cout << i.first << "|"<<i.second << "||";
@@ -308,31 +632,48 @@ public:
 				std::cout << std::endl;
 			}
 #endif //  TEST
-#ifdef TEST
+
 			bool b = false;
-#endif //  TEST
+
 			std::vector<int32_t> removeVector;
 			for (auto& i : iteractionVector)
 			{
 
-				const auto const mol1 = molIterById(i.first);
-				const auto const mol2 = molIterById(i.second);
+				const auto const mol1 = molIterById(i.first,molStates);
+				const auto const mol2 = molIterById(i.second, molStates);
+
+
+				auto msg = std::string(mol1->molObj.get_name() + "+" + mol2->molObj.get_name() + "=");
 #ifdef  TEST
-				std::cout << mol1->molObj.get_name()<<" + "<<mol2->molObj.get_name();
+				std::cout << mol1->molObj.get_name()<<"+"<<mol2->molObj.get_name();
+
 #endif
+
+
 				std::vector<molecules> sum(mol1->molObj + mol2->molObj);
-#ifdef  TEST
+
 				//std::cout << "molIteractions::sum.size() = " << sum.size() << std::endl;
-		         std::cout << " |=> ";
+		         //std::cout << " |=> ";
 				for (auto& r : sum)
 				{
+
+#ifdef  TEST
 					std::cout << r.get_name() << "|";
+#endif //  TEST
+
+					msg += r.get_name();
+					msg += "+";
 
 				}
+#ifdef  TEST
+				std::cout << std::endl;
 				b = true;
-				
-
 #endif //  TEST
+
+
+				if (msg.back() == '+') msg.pop_back();
+				IterLog log;
+				log.addIteractionLogMsg(msg, "");
 
 				auto pos_middle = (mol1->P + mol2->P) / 2.0f;
 				auto dir_middle = (mol1->D + mol2->D) / 2.0f;
@@ -375,9 +716,9 @@ public:
 
 					auto pos = pos_middle + rotVec * 1.1f;
 
-					addMol(s, pos, dir_middle);
+					addMol(s, pos, dir_middle, molStates);
 					molNum++;
-#ifdef TEST
+#ifdef TESTT
 					std::cout << "| " << pos << "  = " << pos_middle << " + " << rotVec << "radius= " << s.get_radius() << std::endl;
 #endif
 				}
@@ -396,7 +737,9 @@ public:
 			
 
 			iteractionVector.clear();
-#ifdef TEST
+
+#ifdef TESTT
+
 			if (b) {
 				std::cout << " molStates:| ";
 				for (auto& s : molStates)
@@ -491,9 +834,9 @@ public:
 						
 						auto pos = pos_middle + rotVec*1.1f;
 
-						addMol(s, pos, dir_middle);
+						addMol(s, pos, dir_middle, molStates);
 						molNum++;
-#ifdef TEST
+#ifdef TESTT
 						std::cout << "| " << pos << "  = " << pos_middle << " + " << rotVec<<"radius= " << s.get_radius()<<std::endl;
 #endif
 					}
@@ -541,8 +884,6 @@ public:
 			std::cout << std::endl;
 #endif
 		}
-
-
 
 
 		void molStaticCollisions() {
@@ -605,7 +946,7 @@ public:
 
 
 				//limiting velocities
-				float speedLimit = 500.f;
+				float speedLimit = 250.f;
 				
 				if(abs(c.first->D.x) > speedLimit || abs(c.first->D.y) > speedLimit)
 				{
@@ -638,39 +979,76 @@ public:
 
 		void mouseControlling() {
 
+			//MOLS
 #ifdef TEST_HARD_DEBUG
 			std::cout << __FUNCTION__ << std::endl;
 #endif TEST_HARD_DEBUG
 
-			auto isPointOverlap = [](const int32_t& x, const int32_t& y, molState& mol) {
+auto isPointOverlap = [](const int32_t& x, const int32_t& y, molState& mol) {
 				return x < (mol.P.x + mol.radius)&&
 					   x > (mol.P.x - mol.radius)&&
 					   y > (mol.P.y - mol.radius)&&
 					   y < (mol.P.y + mol.radius);
 			};
 
+
+auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
+							 const int32_t& rX, const int32_t& rY,
+							 const int32_t& rW, const int32_t& rH) {
+
+		return x < (rX+rW) &&
+			   x > (rX) &&
+		       y < (rY + rH) &&
+		       y > (rY );
+};
+
+
 			if (GetMouse(0).bPressed||GetMouse(1).bPressed)
 			{
+				if (HELP_FLAG) {
+					HELP_FLAG = false; GAME_PAUSE = false;
+				}
+				//if button HELP pressed
+				else if (isPointOverlapRect(GetMouseX(), GetMouseY(), TARGET_SCREEN_SIZE_X - SCREEN_OFFSET - 40, SCREEN_OFFSET - 10, 30, 10))
+						HELP_FLAG = true;
+
+				//if button RESTART pressed
+				if (isPointOverlapRect(GetMouseX(), GetMouseY(), TARGET_SCREEN_SIZE_X - SCREEN_OFFSET - 140, SCREEN_OFFSET - 10, 60, 10))
+				{
+					restart_lvl();
+					load_lvl(current_game_lvl);
+					HELP_FLAG = true;
+
+				}
+						 
+						
 
 				pSelectedMol = nullptr;
 
-				for (auto& mol : molStates) {
+				for (auto& mol : molStates) 
 					if (isPointOverlap(GetMouseX(), GetMouseY(), mol))
 					{
 						pSelectedMol = &mol;
 						break;
 					}
 
-				}
-
+				for(auto& mol:molLeftPool)
+					if (isPointOverlap(GetMouseX(), GetMouseY(), mol))
+					{
+						addMol(mol.molObj, {mol.P.x + SCREEN_OFFSET+ SCREEN_OFFSET, mol.P.y}, {mol.D.x + 10, mol.D.y}, molStates);
+						break;
+					}
+				
 			}
 
+#ifdef TEST
 			if (GetMouse(0).bReleased)
 			{
 				pSelectedMol = nullptr;
 			}
+#endif
 
-			if (GetMouse(1).bReleased)
+			if (GetMouse(1).bReleased||GetMouse(0).bReleased)
 			{
 				if (pSelectedMol != nullptr) 
 				{
@@ -680,6 +1058,7 @@ public:
 				pSelectedMol = nullptr;
 			}
 
+#ifdef TEST
 			if (GetMouse(0).bHeld)
 			{
 
@@ -689,6 +1068,10 @@ public:
 					pSelectedMol->P.y = GetMouseY();
 				}
 			}
+#endif
+			///BUTTONS
+			/// 
+			/// 
 
 		};
 
@@ -698,27 +1081,28 @@ public:
 			std::cout << __FUNCTION__ << std::endl;
 #endif TEST_HARD_DEBUG
 
-			button_panel_side = 100;
+			log_pool_height = 100;
+			log_pool_width = 600;
 
-			left_pool_width = SCREEN_OFFSET * 4;
+			left_pool_width = SCREEN_OFFSET * 2;
 			
-
-			right_pool_width= SCREEN_OFFSET * 4;
+			right_pool_width= SCREEN_OFFSET * 2;
 			
 
 			pool_size_x = SCREEN_OFFSET + left_pool_width;
 			pool_size_y = SCREEN_OFFSET;
-			pool_size_h = TARGET_SCREEN_SIZE_Y - SCREEN_OFFSET * 2 - button_panel_side;
+			pool_size_h = TARGET_SCREEN_SIZE_Y - SCREEN_OFFSET * 2 - log_pool_height;
 			pool_size_w = TARGET_SCREEN_SIZE_X - SCREEN_OFFSET * 2 - left_pool_width - right_pool_width;
 
 			right_pool_height = pool_size_h;
 			left_pool_height = pool_size_h;
+
 		
 		}
 
 		//create mol - super add
 		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction,
-			        olc::vf2d acceleration, olc::Pixel color, float mass)
+			        olc::vf2d acceleration, olc::Pixel color, float mass,std::vector<molState>& molVec,bool bCountInStatistic_)
 		{
 			std::lock_guard<std::mutex> lg(addMol_mtx);
 			olc::vf2d CurrentPos;
@@ -743,7 +1127,8 @@ public:
 			mol.get_radius(),//radius
 			getId(),// ID
 			mass,//mass
-			mol.get_lifetime()//lifetime
+			mol.get_lifetime(),//lifetime
+			bCountInStatistic_//count in statistic
 			};
 			
 			/*
@@ -755,16 +1140,13 @@ public:
 			int32_t radius;
 			int32_t Id;
 			float mass;
-			//0 - empty cell
-			//1 - horisontal walls
-			//2 - vertical walls
-			//100-10000 - particles
+			
 			//friend bool operator==(const molState& mol1, const molState& mol2);
 
 			*/
-			molStates.push_back(currentMolState);
+			molVec.push_back(currentMolState);
 
-
+			if (bCountInStatistic_) {
 			auto val = [&]() {
 				auto search = molStatistics.find(mol.get_name());
 				if (search == molStatistics.end()) return int32_t(1);
@@ -772,12 +1154,11 @@ public:
 				};
 
 			molStatistics.insert_or_assign(mol.get_name(), val());
-				
-				
+			};
 		};
 
 		//add at  possition with direction
-		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction)
+		void addMol(molecules& mol, olc::vf2d position, olc::vf2d direction, std::vector<molState>& molVec)
 		{
 
 			addMol(mol,
@@ -785,12 +1166,42 @@ public:
 				direction,//direction aka velocity vector
 				{ 0,0 },//acceleration 
 				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
-				1.f);
+				1.f,molVec,true);
+
+		};
+
+
+
+
+		void addMol(molecules& mol, olc::vf2d position, std::vector<molState>& molVec)
+		{
+
+			addMol(mol,
+				position,//possition x y
+				{ 0,0 },//direction aka velocity vector
+				{ 0,0 },//acceleration 
+				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
+				1.f, molVec,true);
+
+		};
+		
+
+		void addMol(molecules& mol, olc::vf2d position, std::vector<molState>& molVec,bool bCountStatistic)
+		{
+
+			addMol(mol,
+				position,//possition x y
+				{ 0,0 },//direction aka velocity vector
+				{ 0,0 },//acceleration 
+				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
+				1.f,
+				molVec,
+				bCountStatistic);
 
 		};
 
 		//add at random possition with some attributes
-		void addMol(molecules& mol)
+		void addMol(molecules& mol, std::vector<molState>& molVec)
 		{
 			int32_t radius = 30;
 			olc::vf2d CurrentPos;
@@ -811,19 +1222,20 @@ public:
 				{ 0,0 },//acceleration 
 
 				olc::Pixel(mol.get_color()[0], mol.get_color()[1], mol.get_color()[2]),
-				1.f);
+				1.f,
+			    molVec,true);
 				  
 		};
 
 
-		 const std::vector<molState>::iterator molIterById(int32_t &id)
+		 const std::vector<molState>::iterator molIterById(int32_t &id, std::vector<molState>& vec)
 		{
 			auto search = std::find_if(
-				molStates.begin(),
-				molStates.end(),
+				vec.begin(),
+				vec.end(),
 				[&id](molState& mol) {return mol.Id == id; });
 
-			if (search != molStates.end())
+			if (search != vec.end())
 				return search;
 			else throw("ID NOT FOUND");
 
@@ -846,7 +1258,7 @@ public:
 
 		void removeMol(int32_t &id)
 		{
-			auto search = molIterById(id);
+			auto search = molIterById(id, molStates);
 			if (search != molStates.end()) 
 			{
 				auto val =[&]() {
@@ -872,8 +1284,9 @@ public:
 
 		void printMolStates() {
 			int step = 0;
+			int step2 = 0;
 
-			auto drawPos = pool_size_h + SCREEN_OFFSET + SCREEN_OFFSET+button_panel_side;
+			auto drawPos = pool_size_h + SCREEN_OFFSET + SCREEN_OFFSET+log_pool_height;
 		/*
 		
 			for(auto& m:molStates)
@@ -890,25 +1303,19 @@ public:
 				
 			}
 
-		
 			for (auto& c : collisionVector)
 			{
 				DrawString(SCREEN_OFFSET, drawPos +(step++) * 20,
 					std::string(
 								 " ID1: " + std::to_string(c.first->Id) +
 								" ID2: " + std::to_string(c.second->Id))
-						
-
 					, olc::BLACK, 1);
-
 			}
-
 
 						DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("colvec.size: " + std::to_string(collisionVector.size()))
 				, olc::BLACK, 1);
 			
-
 			for (auto& m : molStates)
 			{
 				DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
@@ -916,13 +1323,7 @@ public:
 						" ID1: " + std::to_string(m.Id) +
 						" ID2: " + m.molObj.get_name())
 						, olc::BLACK, 1);
-
 			}
-
-
-
-			
-
 
 
 			for (auto& i : iteractionVector)
@@ -946,22 +1347,37 @@ public:
 
 			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("iteractionVector.size: " + std::to_string(iteractionVector.size()))
-
-
 				, olc::BLACK, 1);
 
 			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("SECONDS FROM START: " + std::to_string(iSecondFromStart))
-
-
 				, olc::BLACK, 1);
 
+
+			for (auto& msg : IterLog::iteractionsLog){
+				DrawString(left_pool_width+ SCREEN_OFFSET+10, pool_size_h + SCREEN_OFFSET+10 + (step2++) * 10, msg,olc::BLACK,1);
+				//std::cout << "for (auto& msg : IterLog::iteractionsLog): " << msg<<std::endl;
+
+			}
 			//iteractionVector
 
 		}
 
 
 #endif
+
+		void DrawLog()
+		{
+			int step = 0;
+			DrawString(TARGET_SCREEN_SIZE_X - log_pool_width - SCREEN_OFFSET + 10, pool_size_h + SCREEN_OFFSET + 10 + (step++) * 10, "LOG:", olc::BLACK, 1);
+			for (auto& msg : IterLog::iteractionsLog) {
+				DrawString(TARGET_SCREEN_SIZE_X - log_pool_width - SCREEN_OFFSET + 10, pool_size_h + SCREEN_OFFSET + 10 + (step++) * 10, msg, olc::BLACK, 1);
+				if (step == 8)break;
+				//std::cout << "for (auto& msg : IterLog::iteractionsLog): " << msg<<std::endl;
+
+			}
+	
+		};
 
 		const int32_t getId() {
 			
@@ -988,11 +1404,13 @@ private:
 			int32_t Id;
 			float mass;
 			int32_t lifetime;
+			bool bCountInStatistic=true;
 			//0 - empty cell
 			//1 - horisontal walls
 			//2 - vertical walls
 			//100-10000 - particles
 			//friend bool operator==(const molState& mol1, const molState& mol2);
+			//molState(molecules mol) :molObj(mol) {};
 		};
 
 		molState& getMollStateByID(int32_t collisionId) {
@@ -1005,6 +1423,8 @@ private:
 		 std::vector<std::pair<int32_t, int32_t>> iteractionVector;
 		 std::vector<molState> molStates;
 		 std::map<std::string, int32_t> molStatistics;
+		 std::vector<molState> molLeftPool;
+		 std::vector<molState> molResult;
 
 		int32_t pool_size_x,
 				pool_size_y,
@@ -1014,14 +1434,18 @@ private:
 				left_pool_height,
 				right_pool_width,
 				right_pool_height,
-				button_panel_side;
+				log_pool_height,
+				log_pool_width;
 
 
 		molState* pSelectedMol=nullptr;
 
 		int32_t iSecondFromStart=0;
 		float fLastSecond=0;
+		bool HELP_FLAG=true;
+		bool GAME_PAUSE = false;
 
+		std::string current_game_lvl;
 
 //////////////////////////////////////////////////////
 	};
@@ -1029,7 +1453,12 @@ private:
 
 
 //static vars init
-std::map<std::string, std::string> csv_to_RECIPIES::RECIPIES{ {"NULL","NULL" } };
+
+
+	std::vector<std::string> IterLog::iteractionsLog{};
+
+
+std::vector<std::tuple<int32_t, std::string, int32_t, std::string, std::string>> csv_to_RECIPIES::RECIPIES{};
 std::map<std::string, std::vector<int32_t>> molecules::MOLS{ {"NULL",{} } };
 int random_generator::iRand100 = 0;
 int random_generator::iRand = 0;
@@ -1041,13 +1470,14 @@ std::vector<int> random_generator::vRand = { {} };
 std::vector<int> random_generator::vRandH = { {} };
 std::vector<int> random_generator::vRandW = { {} };
 std::vector<int> random_generator::vRandSign = { {} };
+
 /////////////////////////
 
 
 int main()
 {
 	//Initialisations of Experiment Engine
-	csv_to_RECIPIES::csv_to_RECIPIES("recep.csv");
+	//csv_to_RECIPIES::csv_to_RECIPIES("recep.csv");
 #ifdef TEST
 	csv_to_RECIPIES rcp;
 	rcp.print_RECIPIES();

@@ -1,3 +1,8 @@
+/*
+Chemical experiment prototype engine
+GitHub:		https://github.com/ikvasir/proto1
+License: MIT
+*/
 #include "experiment_engine.h"
 #include "test.h"
 material theExperimentEngine::makeExperiment(material& mat1, material& mat2)

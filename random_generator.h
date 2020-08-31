@@ -1,3 +1,8 @@
+/*
+Chemical experiment prototype engine
+GitHub:		https://github.com/ikvasir/proto1
+License: MIT
+*/
 #pragma once
 //after init in main function generating vector random int value of RAND_ARRAY_SIZE  
 //every next using of RAND or RAND100 moving iRand and iRand100 +1 position

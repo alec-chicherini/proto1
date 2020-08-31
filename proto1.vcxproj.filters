@@ -15,9 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="olcExampleProgram.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="molecules.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -28,6 +25,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="recipies.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="test.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="experiment.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,9 +53,6 @@
     <ClInclude Include="test.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="olcExampleProgram.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="recipies.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -62,12 +62,18 @@
     <ClInclude Include="defined_globals.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="utilites.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="recep.csv">
       <Filter>Resource Files</Filter>
     </None>
     <None Include="mols.csv">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="lvls\demo.csv">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>

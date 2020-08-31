@@ -1,0 +1,12 @@
+//availible mols
+mols=H2O,NaCl,Al,FeSO4
+//availible_recepies
+FeSO4,7H2O,Fe2O3+SO2+H2O+O2
+O2,2SO2,2SO3
+SO3,H2O,H2SO4
+NaCl,H2SO4,NaHSO4+HCl
+2Al,6H2O,2Al(OH)3+3H2
+Al(OH)3,3HCl,AlCl3+3H2O
+//waiting_result
+result=AlCl3
+//end

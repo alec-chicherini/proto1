@@ -89,6 +89,7 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -104,6 +105,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -146,8 +148,9 @@
     <ClCompile Include="experiment_engine.cpp" />
     <ClCompile Include="material.cpp" />
     <ClCompile Include="molecules.cpp" />
-    <ClCompile Include="olcExampleProgram.cpp" />
+    <ClCompile Include="experiment.cpp" />
     <ClCompile Include="recipies.cpp" />
+    <ClCompile Include="test.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="defined_globals.h" />
@@ -155,13 +158,14 @@
     <ClInclude Include="experiment_enums.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="molecules.h" />
-    <ClInclude Include="olcExampleProgram.h" />
     <ClInclude Include="olcPixelGameEngine.h" />
     <ClInclude Include="random_generator.h" />
     <ClInclude Include="recipies.h" />
     <ClInclude Include="test.h" />
+    <ClInclude Include="utilites.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="lvls\demo.csv" />
     <None Include="mols.csv" />
     <None Include="recep.csv" />
   </ItemGroup>
