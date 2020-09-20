@@ -7,15 +7,12 @@ License: MIT
 
 //#define IN_CONSOLE
 
-
-
 //#define TEST_HARD_DEBUG
 
-
-//#define TEST
+#define TEST
 
 //adds ne screen under main to check collisions
-//#define SHOW_TEST_INFO
+#define SHOW_TEST_INFO
 
 #ifdef SHOW_TEST_INFO
 	#define SCREEN_SIZE_X 1280
@@ -31,9 +28,6 @@ License: MIT
 class IterLog{
 	public:
 static std::vector<std::string> iteractionsLog;
-
-
-
 
 template<typename... Ts>
 constexpr auto make_array(Ts&&... ts)

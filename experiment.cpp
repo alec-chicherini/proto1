@@ -135,14 +135,11 @@ public:
 	}
 
 	
-
-	
 	//void inline  DrawMaterial(olc::vf2d* pos, material& mat, olc::Pixel clr)
 	//{
 	//	for (int i = 0; i < mat.size(); i++)DrawMolecule(pos[i], mat[i], clr);
 	//}
 	
-
 ////////////////////////////////////////////////////////////////////////////////////////////////
 /////methods  for another class
 
@@ -151,7 +148,6 @@ public:
 
 		void gameLogic() {
 		
-
 			for (auto& r : molResult)
 			{
 				std::string name=r.molObj.get_name();
@@ -275,15 +271,7 @@ public:
 			};
 			////////////////////////////////
 
-
-
-
-
-
-
-			
 		};
-
 
 
 		//update UI
@@ -1106,8 +1094,8 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 		{
 			std::lock_guard<std::mutex> lg(addMol_mtx);
 			olc::vf2d CurrentPos;
-			int32_t randX = RAND_X%pool_size_w;
-			int32_t randY = RAND_Y%pool_size_h;
+			int32_t randX = RAND%pool_size_w;
+			int32_t randY = RAND%pool_size_h;
 
 			if (randX <= mol.get_radius())CurrentPos.x = mol.get_radius() + pool_size_x;
 			else if (randX >= pool_size_w - mol.get_radius())CurrentPos.x = pool_size_x+pool_size_w - mol.get_radius();
@@ -1205,8 +1193,8 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 		{
 			int32_t radius = 30;
 			olc::vf2d CurrentPos;
-			int32_t randX = RAND_X % pool_size_w;
-			int32_t randY = RAND_Y % pool_size_h;
+			int32_t randX = RAND % pool_size_w;
+			int32_t randY = RAND % pool_size_h;
 
 			if (randX <= radius)CurrentPos.x = radius + pool_size_x;
 			else if (randX >= pool_size_w - radius)CurrentPos.x = pool_size_x + pool_size_w - radius;
@@ -1341,10 +1329,10 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 				std::string("molStates.size: " + std::to_string(molStates.size()))
 				, olc::BLACK, 1);
 
-			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+			/*DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("last added mol ID: " + std::to_string(molStates.back().Id))
 				, olc::BLACK, 1);
-
+*/
 			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
 				std::string("iteractionVector.size: " + std::to_string(iteractionVector.size()))
 				, olc::BLACK, 1);
@@ -1353,13 +1341,13 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 				std::string("SECONDS FROM START: " + std::to_string(iSecondFromStart))
 				, olc::BLACK, 1);
 
-
+			/*
 			for (auto& msg : IterLog::iteractionsLog){
 				DrawString(left_pool_width+ SCREEN_OFFSET+10, pool_size_h + SCREEN_OFFSET+10 + (step2++) * 10, msg,olc::BLACK,1);
 				//std::cout << "for (auto& msg : IterLog::iteractionsLog): " << msg<<std::endl;
 
 			}
-			//iteractionVector
+			//iteractionVector*/
 
 		}
 
@@ -1405,10 +1393,7 @@ private:
 			float mass;
 			int32_t lifetime;
 			bool bCountInStatistic=true;
-			//0 - empty cell
-			//1 - horisontal walls
-			//2 - vertical walls
-			//100-10000 - particles
+			
 			//friend bool operator==(const molState& mol1, const molState& mol2);
 			//molState(molecules mol) :molObj(mol) {};
 		};
@@ -1454,22 +1439,14 @@ private:
 
 //static vars init
 
-
-	std::vector<std::string> IterLog::iteractionsLog{};
-
+std::vector<std::string> IterLog::iteractionsLog{};
 
 std::vector<std::tuple<int32_t, std::string, int32_t, std::string, std::string>> csv_to_RECIPIES::RECIPIES{};
+
 std::map<std::string, std::vector<int32_t>> molecules::MOLS{ {"NULL",{} } };
-int random_generator::iRand100 = 0;
+
 int random_generator::iRand = 0;
-int random_generator::iRandH = 0;
-int random_generator::iRandW = 0;
-int random_generator::iRandSign = 0;
-std::vector<int> random_generator::vRand100 = { {} };
 std::vector<int> random_generator::vRand = { {} };
-std::vector<int> random_generator::vRandH = { {} };
-std::vector<int> random_generator::vRandW = { {} };
-std::vector<int> random_generator::vRandSign = { {} };
 
 /////////////////////////
 
@@ -1489,12 +1466,12 @@ int main()
 	init.print_MOLS();
 #endif
 	random_generator R;
-	R.rand_init(640,480);
+	R.rand_init(10);
 
-	//for (int i = 0; i < 100; i++) {
+	for (int i = 0; i < 100; i++) {
 	
-		//std::cout << "RAND= " << RAND << " RAND_W = "<< RAND_W <<" RAND_H = " << RAND_H << " RAND100 = "<< RAND100<<std::endl;
-		//std::cout << "RAND_SIGN " << RAND_SIGN << std::endl;}
+		std::cout << "RAND= " << RAND<<std::endl;
+		}
 
 	//end of Inits
 
