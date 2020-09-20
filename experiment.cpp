@@ -90,6 +90,8 @@ public:
 
 #endif
 
+		fCameraPosition = {0.f,0.f};
+
 		return true;
 	}
 
@@ -116,6 +118,7 @@ public:
 		}
 		Clear(olc::WHITE);
 		mouseControlling();
+		DrawWorldMarks();
 		DrawPool();
 		DrawMols();
 		DrawLeftPool();
@@ -273,8 +276,41 @@ public:
 
 		};
 
+		void DrawWorldMarks() 
+		{
+			int LINE_SIZE = 5;
+			int MARKS_DISTANCE = 100;
 
-		//update UI
+			int _i =  static_cast<int>(fCameraPosition.x) / 100;
+			int _j =  static_cast<int>(fCameraPosition.y) / 100;
+			//std::cout << " i = " << _i << " j= " << _j << std::endl;
+
+			const int numOfMarksX = pool_size_w / MARKS_DISTANCE + 3 + _i;
+			const int numOfMarksY = pool_size_h / MARKS_DISTANCE + 3 + _j;
+			//std::cout << " numOfMarksX = " << numOfMarksX << " numOfMarksY= " << numOfMarksY << std::endl;
+
+			for (int i = _i; i < numOfMarksX; i++)
+				for (int j = _j; j < numOfMarksY; j++)
+				{
+					olc::vi2d pos = { static_cast<int>(fCameraPosition.x) + (i-2*_i) * MARKS_DISTANCE  ,
+						              static_cast<int>(fCameraPosition.y) + (j-2*_j) * MARKS_DISTANCE  };
+					
+					if (pos.x > (pool_size_x + LINE_SIZE) &&
+						pos.x < (pool_size_x + pool_size_w - LINE_SIZE) &&
+						pos.y >(pool_size_y + LINE_SIZE) &&
+						pos.y < (pool_size_y + pool_size_h - LINE_SIZE)) {
+
+						DrawLine({ pos.x - LINE_SIZE, pos.y },
+							{ pos.x + LINE_SIZE, pos.y },
+							olc::RED);
+						DrawLine({ pos.x , pos.y - LINE_SIZE },
+							{ pos.x , pos.y + LINE_SIZE },
+							olc::RED);
+					}
+				};
+
+		}
+		
 		void DrawPool() {
 #ifdef TEST_HARD_DEBUG
 			std::cout << __FUNCTION__ << std::endl;
@@ -338,7 +374,7 @@ public:
 				"   \n"
 				
 				"   \n"
-				"         CLICK ON THE MOLECULE ON THE LEFT                                                                    ^                       \n"
+				"         CLICK ON THE MOLECULE ON THE LEFT                                                                     ^                       \n"
 				"<--                                                                                                      HELP  |                                            \n"
 				"         TO ADD IT IN THE                                                                                                                             \n"
 				"                                                                                                            AND                                   \n"
@@ -375,14 +411,15 @@ public:
 				"   \n"
 				"   \n"
 				"   \n"
-				"   \n"			
 				"   \n"
 				"   \n"
+				"                                                         CLICK AND DRAG                                                                 \n"
+				"                                                   <=                        =>   \n"                                  
+				"                                                         ON FIELD TO SCROLL                                                                \n"
 				"   \n"
+				"                                                                                                         \n"
 				"   \n"
-				"   \n"
-				"   \n"
-				"   \n"
+
 				"   \n"
 				"   \n"
 				"                                                                                                STATISTICS   -->             \n"
@@ -412,14 +449,24 @@ public:
 #endif TEST_HARD_DEBUG
 			for (auto& mol : molStates) {//draw molecule
 
-#ifdef SHOW_TEST_INFO
+			//draw molecules only inside pool
+			if (!(mol.P.x > ( pool_size_x + mol.radius- fCameraPosition.x  ) &&
+				mol.P.x < (-fCameraPosition.x + pool_size_x + pool_size_w - mol.radius) &&
+				mol.P.y >(-fCameraPosition.y + pool_size_y + mol.radius) &&
+				mol.P.y < (-fCameraPosition.y + pool_size_y + pool_size_h - mol.radius)))
+				{
+				continue;
+				}
 
+
+#ifdef SHOW_TEST_INFO
 				int gradus1 = round(gradus(mol.D));
 				
 #endif // SHOW_TEST_INFO
-				DrawCircle(mol.P, mol.radius, mol.molColor);
-				FillCircle(mol.P, mol.radius, mol.molColor);
-				DrawString(mol.P.x - mol.radius+5, mol.P.y,
+
+				DrawCircle(fCameraPosition+mol.P, mol.radius, mol.molColor);
+				FillCircle(fCameraPosition + mol.P, mol.radius, mol.molColor);
+				DrawString(fCameraPosition.x + mol.P.x - mol.radius+5, fCameraPosition.y  + mol.P.y,
 
 #ifndef SHOW_TEST_INFO
 					mol.molObj.get_name(),
@@ -431,23 +478,25 @@ public:
 #endif // SHOW_TEST_INFO
 					olc::WHITE, 1);
 
-
 				std::string sLifetime = (mol.lifetime == -1)?"inf":std::to_string(mol.lifetime);
-				DrawString(mol.P.x + mol.radius,mol.P.y - mol.radius, sLifetime, mol.molColor,1);
-
+				DrawString(fCameraPosition.x + mol.P.x + mol.radius, fCameraPosition.y + mol.P.y - mol.radius, sLifetime, mol.molColor,1);
 
 			}
 
 #ifdef SHOW_TEST_INFO
 			for(auto& c:collisionVector)
-			DrawLine(c.first->P.x,c.first->P.y, c.second->P.x, c.second->P.y, olc::RED);
+			DrawLine(fCameraPosition.x + c.first->P.x, fCameraPosition.y + c.first->P.y,
+				     fCameraPosition.x + c.second->P.x, fCameraPosition.y + c.second->P.y,
+				     olc::RED);
 #endif // !SHOW_TEST_INFO
 
 			if (pSelectedMol != nullptr)
 			{
-				DrawLine(pSelectedMol->P.x, pSelectedMol->P.y,GetMouseX(), GetMouseY(),olc::BLACK);
+				DrawLine(fCameraPosition.x + pSelectedMol->P.x, fCameraPosition.y + pSelectedMol->P.y,GetMouseX(), GetMouseY(),olc::BLACK);
 			}
 		}
+
+
 		void DrawRecepies() 
 		{
 
@@ -521,10 +570,12 @@ public:
 				mol.P.x += mol.D.x * fElapsedTime;
 				mol.P.y += mol.D.y * fElapsedTime;
 
+				/*
 				if (mol.P.x > pool_size_x + pool_size_w) { mol.P.x = float(pool_size_x); }
 				if (mol.P.y > pool_size_y + pool_size_h) { mol.P.y = float(pool_size_y); }
 				if (mol.P.x < pool_size_x) { mol.P.x = float(pool_size_w + pool_size_x); }
 				if (mol.P.y < pool_size_y) { mol.P.y = float(pool_size_h + pool_size_y); }
+				*/
 
 				if ((mol.D.x * mol.D.x + mol.D.y * mol.D.y) < 0.001f)
 				{
@@ -1010,43 +1061,54 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 				}
 						 
 						
-
 				pSelectedMol = nullptr;
 
-				for (auto& mol : molStates) 
-					if (isPointOverlap(GetMouseX(), GetMouseY(), mol))
+				for (auto& mol : molStates)
+					if (isPointOverlap(GetMouseX()- int32_t(fCameraPosition.x), GetMouseY()-int32_t(fCameraPosition.y), mol))
 					{
 						pSelectedMol = &mol;
 						break;
 					}
+				//world camera movement
+			    if(pSelectedMol==nullptr&&isPointOverlapRect(GetMouseX(), GetMouseY(), pool_size_x,pool_size_y,pool_size_w,pool_size_h)){
+						bWorldSelect = true;
+						fCameraPossitionMoveDelta = { float(GetMouseX()), float(GetMouseY()) };
+					     }
 
 				for(auto& mol:molLeftPool)
 					if (isPointOverlap(GetMouseX(), GetMouseY(), mol))
 					{
-						addMol(mol.molObj, {mol.P.x + SCREEN_OFFSET+ SCREEN_OFFSET, mol.P.y}, {mol.D.x + 10, mol.D.y}, molStates);
+						addMol(mol.molObj, { mol.P.x - fCameraPosition.x + SCREEN_OFFSET+ SCREEN_OFFSET, mol.P.y - fCameraPosition.y }, {mol.D.x + 10, mol.D.y}, molStates);
 						break;
 					}
 				
 			}
 
-#ifdef TEST
+#ifdef TESTT
 			if (GetMouse(0).bReleased)
 			{
 				pSelectedMol = nullptr;
 			}
 #endif
 
+			if (bWorldSelect) {
+				fCameraPosition += (fCameraPossitionMoveDelta - olc::vf2d{ static_cast<float>(GetMouseX()), static_cast<float>(GetMouseY()) });
+				fCameraPossitionMoveDelta = { static_cast<float>(GetMouseX()), static_cast<float>(GetMouseY()) };
+			}
+
+
 			if (GetMouse(1).bReleased||GetMouse(0).bReleased)
 			{
 				if (pSelectedMol != nullptr) 
 				{
-					pSelectedMol->D.x = 5.0f * ((pSelectedMol->P.x) - static_cast<float>(GetMouseX()));
-					pSelectedMol->D.y = 5.0f * ((pSelectedMol->P.y) - static_cast<float>(GetMouseY()));
+					pSelectedMol->D.x = 5.0f * ((fCameraPosition.x + pSelectedMol->P.x) - static_cast<float>(GetMouseX()));
+					pSelectedMol->D.y = 5.0f * ((fCameraPosition.y + pSelectedMol->P.y) - static_cast<float>(GetMouseY()));
 				};
 				pSelectedMol = nullptr;
+				bWorldSelect = false;
 			}
 
-#ifdef TEST
+#ifdef TESTT
 			if (GetMouse(0).bHeld)
 			{
 
@@ -1341,6 +1403,14 @@ auto isPointOverlapRect = [](const int32_t& x, const int32_t& y,
 				std::string("SECONDS FROM START: " + std::to_string(iSecondFromStart))
 				, olc::BLACK, 1);
 
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("bWorldSelect: " + std::to_string(bWorldSelect))
+				, olc::BLACK, 1);
+			DrawString(SCREEN_OFFSET, drawPos + (step++) * 20,
+				std::string("fCameraPosition: " + std::to_string(fCameraPosition.x) +" "+ std::to_string(fCameraPosition.y))
+				, olc::BLACK, 1);
+
+			
 			/*
 			for (auto& msg : IterLog::iteractionsLog){
 				DrawString(left_pool_width+ SCREEN_OFFSET+10, pool_size_h + SCREEN_OFFSET+10 + (step2++) * 10, msg,olc::BLACK,1);
@@ -1411,6 +1481,8 @@ private:
 		 std::vector<molState> molLeftPool;
 		 std::vector<molState> molResult;
 
+
+
 		int32_t pool_size_x,
 				pool_size_y,
 				pool_size_w,
@@ -1431,6 +1503,10 @@ private:
 		bool GAME_PAUSE = false;
 
 		std::string current_game_lvl;
+
+		olc::vf2d fCameraPosition, fCameraPossitionMoveDelta;
+		bool bWorldSelect = false;
+
 
 //////////////////////////////////////////////////////
 	};
